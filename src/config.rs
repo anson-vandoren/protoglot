@@ -14,6 +14,7 @@ pub struct SenderSettings {
     pub rate: u64,
     #[serde(default = "default_tls")]
     pub tls: bool,
+    pub protocol: String,
     pub message_type: String,
     pub num_senders: u64,
 }
@@ -22,7 +23,6 @@ fn default_tls() -> bool {
     true
 }
 
-// TODO: file watching for config changes?
 impl Settings {
     pub fn load() -> Result<Self, config::ConfigError> {
         let builder = config::Config::builder()

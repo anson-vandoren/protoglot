@@ -2,12 +2,14 @@
   "senders": [
     {
       "host": "example.com", // FQDN or IP address
-      "tls": true, // defaults to true if omitted
       "port": 514,
+      "tls": true, // defaults to true if omitted
+      "protocol": "tcp", // "tcp" or "udp"
       "rate": 1000, // in events per second
       // currently supported message types:
       // - "syslog3164": RFC 3164 syslog message
       "message_type": "syslog3164",
+      "num_senders": 1, // number of concurrent senders to run, each at the EPS rate above
     }
   ],
   // file containing newline-separated strings to use as the message/raw field when appropriate
