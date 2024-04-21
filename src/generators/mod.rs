@@ -1,5 +1,5 @@
 mod event;
-mod event_generator;
+mod syslog;
 
-pub use event::Event;
-pub use event_generator::{EventGenerator, Syslog3164EventGenerator};
+pub use event::{Event, EventGenerator, MessageGenerator};
+pub use syslog::Syslog3164EventGenerator;

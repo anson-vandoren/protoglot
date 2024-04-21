@@ -1,43 +1,46 @@
-pub mod sender;
-mod serializers;
-mod transports;
 mod generators;
+mod sender;
+mod transports;
+mod config;
+
+use std::sync::Arc;
+
+use transports::tcp_tls::TcpTlsTransport;
 
 use sender::Sender;
-use serializers::ndjson::NdJsonSerializer;
-use std::time::Duration;
-use transports::tcp_tls::TcpTlsTransport;
 
 #[tokio::main]
 async fn main() -> tokio::io::Result<()> {
-    let fqdn = "default.main.exciting-sharp-d7ds9oz.cribl-staging.cloud";
-    let port = 10070;
+    let config = config::Settings::load().expect("Failed to load config, nothing to do");
+    println!("{:?}", config);
+    let message_generator = Arc::new(
+        generators::MessageGenerator::new(&config.message_file).expect("Failed to load message file")
+    );
 
-    let mut fast_sender = Sender {
-        transport: TcpTlsTransport::new(fqdn.to_string(), port).await?,
-        serializer: NdJsonSerializer,
-        generator: generators::Syslog3164EventGenerator,
-        rate: Duration::from_millis(10),
-    };
+    // spawn each sender as a separate task and collect their handles
+    let mut handles = Vec::new();
+    for sender_config in config.senders {
+        let transport = TcpTlsTransport::new(sender_config.host, sender_config.port).await?;
+        let generator = match sender_config.message_type.as_ref() {
+            "syslog3164" => crate::generators::Syslog3164EventGenerator {
+                message_generator: message_generator.clone(),
+            },
+            _ => panic!("Unknown message type: {}", sender_config.message_type),
+        };
+        let mut sender = Sender{ 
+            transport, 
+            generator, 
+            rate: sender_config.rate,
+        };
 
-    // let mut slow_sender = Sender {
-    //     transport: TcpTlsTransport::new(fqdn.to_string(), port).await?,
-    //     serializer: NdJsonSerializer,
-    //     rate: Duration::from_secs(1),
-    // };
-
-    let _handles = vec![
-        tokio::spawn(async move {
-            fast_sender.run().await.unwrap();
-        }),
-        // tokio::spawn(async move {
-        //     slow_sender.run().await.unwrap();
-        // }),
-    ];
-
-    for handle in _handles {
-        handle.await?;
+        handles.push(tokio::spawn(async move {
+            sender.run().await.expect("Failed to run sender");
+        }));
     }
 
+    // wait for all senders to complete (i.e., in our case, run forever)
+    for handle in handles {
+        handle.await.expect("Failed to await sender");
+    }
     Ok(())
 }

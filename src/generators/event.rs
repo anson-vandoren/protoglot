@@ -1,58 +1,36 @@
-use serde_json::Value;
-use std::{collections::HashMap, time::SystemTime};
+use rand::prelude::*;
+use std::sync::Arc;
+use std::{io, fs};
 
-pub struct Event {
-    pub timestamp: u64,
-    pub message: String,
-    pub index: Option<String>,
-    pub source: Option<String>,
-    pub sourcetype: Option<String>,
-    pub hostname: Option<String>,
-    pub facility: Option<u8>,
-    pub severity: Option<u8>,
-    pub application_name: Option<String>,
-    pub process_id: Option<u32>,
-    pub message_id: Option<String>,
-    pub fields: HashMap<String, Value>,
+pub trait Event {
+    fn serialize(&self) -> Vec<u8>;
 }
 
-impl Event {
-    pub fn new(timestamp: u64, message: String) -> Self {
-        Event {
-            timestamp,
-            message,
-            index: None,
-            source: None,
-            sourcetype: None,
-            hostname: None,
-            facility: None,
-            severity: None,
-            application_name: None,
-            process_id: None,
-            message_id: None,
-            fields: HashMap::new(),
-        }
+pub trait EventGenerator {
+    fn generate(&self) -> Box<dyn Event + Send>;
+}
+
+pub struct MessageGenerator {
+    lines: Arc<Vec<String>>,
+}
+
+impl MessageGenerator {
+    pub fn new(file_path: &str) -> io::Result<Self> {
+        let lines = fs::read_to_string(file_path)?
+            .lines()
+            .map(|s| s.to_string())
+            .collect();
+        Ok(Self {
+            lines: Arc::new(lines),
+        })
     }
-}
 
-impl Default for Event {
-    fn default() -> Self {
-        Event {
-            timestamp: SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .expect("Time went backwards")
-                .as_secs(),
-            message: "This is a fucking message".to_string(),
-            index: None,
-            source: None,
-            sourcetype: None,
-            hostname: None,
-            facility: None,
-            severity: None,
-            application_name: None,
-            process_id: None,
-            message_id: None,
-            fields: HashMap::new(),
+    pub fn generate(&self) -> Option<String> {
+        if self.lines.is_empty() {
+            None
+        } else {
+            let mut rng = thread_rng();
+            Some(self.lines[rng.gen_range(0..self.lines.len())].clone())
         }
     }
 }

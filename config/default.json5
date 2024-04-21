@@ -1,0 +1,15 @@
+{
+  "senders": [
+    {
+      "host": "example.com", // FQDN or IP address
+      "tls": true, // defaults to true if omitted
+      "port": 514,
+      "rate": 1000, // in events per second
+      // currently supported message types:
+      // - "syslog3164": RFC 3164 syslog message
+      "message_type": "syslog3164",
+    }
+  ],
+  // file containing newline-separated strings to use as the message/raw field when appropriate
+  "message_file": "config/reticulating_splines.txt"
+}
