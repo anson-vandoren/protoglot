@@ -1,6 +1,6 @@
 use rand::prelude::*;
 use std::sync::Arc;
-use std::{io, fs};
+use std::{fs, io};
 
 pub trait Event {
     fn serialize(&self) -> Vec<u8>;

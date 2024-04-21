@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use config;
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Settings {
@@ -15,6 +15,7 @@ pub struct SenderSettings {
     #[serde(default = "default_tls")]
     pub tls: bool,
     pub message_type: String,
+    pub num_senders: u64,
 }
 
 fn default_tls() -> bool {

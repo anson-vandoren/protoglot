@@ -40,7 +40,7 @@ impl Event for Syslog3164 {
 }
 
 pub struct Syslog3164EventGenerator {
-    pub message_generator: Arc::<MessageGenerator>,
+    pub message_generator: Arc<MessageGenerator>,
 }
 
 impl EventGenerator for Syslog3164EventGenerator {
