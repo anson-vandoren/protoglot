@@ -1,4 +1,4 @@
-use crate::event::Event;
+use crate::generators::Event;
 pub mod ndjson;
 
 pub trait Serializer {

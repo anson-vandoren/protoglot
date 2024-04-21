@@ -4,5 +4,5 @@ pub mod tcp_tls;
 pub mod udp;
 
 pub trait Transport {
-    async fn send(&mut self, data: Vec<u8>) -> tokio::io::Result<()>;
+    fn send(&mut self, data: Vec<u8>) -> impl std::future::Future<Output = tokio::io::Result<()>> + Send;
 }

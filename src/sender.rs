@@ -1,22 +1,25 @@
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 
-use crate::{event::Event, serializers::Serializer, transports::Transport};
+use crate::{generators::EventGenerator, serializers::Serializer, transports::Transport};
 
-pub struct Sender<T: Transport, S: Serializer> {
+pub struct Sender<T: Transport, S: Serializer, G: EventGenerator> {
     pub transport: T,
     pub serializer: S,
+    pub generator: G,
     pub rate: Duration,
 }
 
-impl<T, S> Sender<T, S>
+impl<T, S, G> Sender<T, S, G>
 where
     T: Transport + Send + 'static,
     S: Serializer + Send + 'static,
+    G: EventGenerator + Send + 'static,
 {
-    pub fn new(transport: T, serializer: S, rate: Duration) -> Self {
+    pub fn new(transport: T, serializer: S, generator: G, rate: Duration) -> Self {
         Self {
             transport,
             serializer,
+            generator,
             rate,
         }
     }
@@ -25,13 +28,7 @@ where
         let mut interval = tokio::time::interval(self.rate);
         loop {
             interval.tick().await;
-            let event = Event::new(
-                SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .expect("Time went backwards")
-                    .as_secs(),
-                "Test message".to_string(),
-            );
+            let event = self.generator.generate();
             let serialized = self.serializer.serialize(&event);
             self.transport.send(serialized).await?;
         }

@@ -1,7 +1,7 @@
 use serde_json::Value;
 
 use super::Serializer;
-use crate::event::Event;
+use crate::generators::Event;
 pub struct NdJsonSerializer;
 
 impl Serializer for NdJsonSerializer {
@@ -31,8 +31,8 @@ impl Serializer for NdJsonSerializer {
         if let Some(ref hostname) = event.hostname {
             json_map.insert("hostname".to_string(), Value::from(hostname.to_string()));
         }
-        if let Some(ref pri) = event.pri {
-            json_map.insert("pri".to_string(), Value::from(*pri));
+        if let Some(ref facility) = event.facility {
+            json_map.insert("pri".to_string(), Value::from(*facility));
         }
         if let Some(ref severity) = event.severity {
             json_map.insert("severity".to_string(), Value::from(*severity));
@@ -76,7 +76,7 @@ mod tests {
             source: None,
             sourcetype: None,
             hostname: None,
-            pri: None,
+            facility: None,
             severity: None,
             application_name: None,
             process_id: None,
@@ -105,7 +105,7 @@ mod tests {
             source: Some("test_source".to_string()),
             sourcetype: Some("test_sourcetype".to_string()),
             hostname: Some("test_hostname".to_string()),
-            pri: Some(1),
+            facility: Some(1),
             severity: Some(2),
             application_name: Some("test_app".to_string()),
             process_id: Some(123),
@@ -143,7 +143,7 @@ mod tests {
             source: None,
             sourcetype: None,
             hostname: None,
-            pri: None,
+            facility: None,
             severity: None,
             application_name: None,
             process_id: None,
