@@ -5,9 +5,9 @@ mod transports;
 
 use std::sync::Arc;
 
-use transports::tcp_tls::TcpTlsTransport;
-
 use sender::Sender;
+
+use crate::transports::TransportType;
 
 #[tokio::main]
 async fn main() -> tokio::io::Result<()> {
@@ -23,7 +23,14 @@ async fn main() -> tokio::io::Result<()> {
     for sender_config in config.senders {
         let num_senders = sender_config.num_senders;
         for _ in 0..num_senders {
-            let transport = TcpTlsTransport::new(sender_config.host.clone(), sender_config.port).await?;
+            let transport = match sender_config.protocol.as_ref() {
+                "tcp" => match sender_config.tls {
+                    true => TransportType::TcpTls(transports::tcp_tls::TcpTlsTransport::new(sender_config.host.clone(), sender_config.port).await?),
+                    false => TransportType::Tcp(transports::tcp::TcpTransport::new(sender_config.host.clone(), sender_config.port).await?),
+                },
+                "udp" => panic!("UDP not implemented"),
+                _ => panic!("Unknown protocol: {}", sender_config.protocol),
+            };
             let generator = match sender_config.message_type.as_ref() {
                 "syslog3164" => crate::generators::Syslog3164EventGenerator {
                     message_generator: message_generator.clone(),
