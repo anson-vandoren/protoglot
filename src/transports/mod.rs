@@ -6,6 +6,7 @@ pub mod udp;
 pub enum TransportType {
     Tcp(tcp::TcpTransport),
     TcpTls(tcp_tls::TcpTlsTransport),
+    Udp(udp::UdpTransport),
 }
 
 impl Transport for TransportType {
@@ -16,6 +17,7 @@ impl Transport for TransportType {
         match self {
             TransportType::Tcp(transport) => transport.send(data).await,
             TransportType::TcpTls(transport) => transport.send(data).await,
+            TransportType::Udp(transport) => transport.send(data).await,
         }
     }
 }

@@ -28,7 +28,9 @@ async fn main() -> tokio::io::Result<()> {
                     true => TransportType::TcpTls(transports::tcp_tls::TcpTlsTransport::new(sender_config.host.clone(), sender_config.port).await?),
                     false => TransportType::Tcp(transports::tcp::TcpTransport::new(sender_config.host.clone(), sender_config.port).await?),
                 },
-                "udp" => panic!("UDP not implemented"),
+                "udp" => {
+                    TransportType::Udp(transports::udp::UdpTransport::new(sender_config.host.clone(), sender_config.port).await?)
+                }
                 _ => panic!("Unknown protocol: {}", sender_config.protocol),
             };
             let generator = match sender_config.message_type.as_ref() {
