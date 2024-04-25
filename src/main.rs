@@ -39,11 +39,13 @@ async fn main() -> tokio::io::Result<()> {
                 },
                 _ => panic!("Unknown message type: {}", sender_config.message_type),
             };
-            let mut sender = Sender {
-                transport,
-                generator,
+            let config = sender::SenderConfig {
                 rate: sender_config.rate,
+                num_batches: sender_config.num_batches,
+                events_per_batch: sender_config.events_per_batch,
+                batch_delay: sender_config.batch_delay,
             };
+            let mut sender = Sender::new(transport, generator, config);
 
             handles.push(tokio::spawn(async move {
                 sender.run().await.expect("Failed to run sender");

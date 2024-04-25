@@ -8,6 +8,7 @@ pub struct Settings {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct SenderSettings {
     pub host: String,
     pub port: u16,
@@ -17,6 +18,9 @@ pub struct SenderSettings {
     pub protocol: String,
     pub message_type: String,
     pub num_senders: u64,
+    pub events_per_batch: u64,
+    pub num_batches: u64,
+    pub batch_delay: u64,
 }
 
 fn default_tls() -> bool {
