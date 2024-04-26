@@ -1,7 +1,11 @@
 [package]
 name = "bablfsh"
 version = "0.1.0"
+authors = ["Anson VanDoren <anson@ansonvandoren.com>"]
 edition = "2021"
+description = "A data generator & load tool, mostly built for testing Cribl Stream"
+license = "MIT"
+license-file = "LICENSE"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
