@@ -18,6 +18,19 @@ it's useful to have a tool that can send and receive data to and from these dest
 the Babel fish, bablfsh nourishes itself on the detrius of the internet and excretes made-up events into
 Cribl Stream while also absorbing the unconscious mental frequencies emitted by Cribl Stream.
 
+# How do I use it?
+
+## Building
+
+- TODO: Add detailed instructions for building. For now, you'll need a Rust toolchain installed, and then from the
+  repo root, run `cargo build --release`. The resultant binary will be in `target/release/bablfsh`.
+
+## Running
+
+- Better configuration to come, but for now either run the binary or `cargo run` from repo root. A config
+  file will be expected in `./config/default.json5` or `.config/local.json5` (JSON5 is a superset of JSON).
+  See the included `./config/default.json5` for an example configuration.
+
 # Components:
 
 ## Emitters
