@@ -44,5 +44,4 @@ Cribl Stream while also absorbing the unconscious mental frequencies emitted by 
 - Emitters are composed of:
   - A data generator
   - An event formatter/serializer
-  - A batch formatter (optional)
   - A transport

@@ -2,21 +2,21 @@ use std::time::Duration;
 
 use crate::{generators::EventGenerator, transports::Transport};
 
-pub struct SenderConfig {
+pub struct EmitterConfig {
     pub rate: u64,             // events per second
     pub num_batches: u64,      // number of batches to send, 0 means run forever
     pub events_per_batch: u64, // number of events per batch
     pub batch_delay: u64,      // delay between batches in milliseconds
 }
 
-pub struct Sender<T: Transport, G: EventGenerator> {
+pub struct Emitter<T: Transport, G: EventGenerator> {
     pub transport: T,
     pub generator: G,
-    pub config: SenderConfig,
+    pub config: EmitterConfig,
     batches_sent: u64,
 }
 
-impl<T, G> Sender<T, G>
+impl<T, G> Emitter<T, G>
 where
     T: Transport + Send + 'static,
     G: EventGenerator + Send + 'static,
@@ -40,8 +40,8 @@ where
         }
         Ok(())
     }
-    pub fn new(transport: T, generator: G, config: SenderConfig) -> Self {
-        Sender {
+    pub fn new(transport: T, generator: G, config: EmitterConfig) -> Self {
+        Emitter {
             transport,
             generator,
             config,

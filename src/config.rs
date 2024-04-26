@@ -3,12 +3,12 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Settings {
-    pub senders: Vec<SenderSettings>,
+    pub emitters: Vec<EmitterSettings>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct SenderSettings {
+pub struct EmitterSettings {
     pub host: String,
     pub port: u16,
     pub rate: u64,
@@ -16,7 +16,7 @@ pub struct SenderSettings {
     pub tls: bool,
     pub protocol: String,
     pub message_type: String,
-    pub num_senders: u64,
+    pub num_emitters: u64,
     pub events_per_batch: u64,
     pub num_batches: u64,
     pub batch_delay: u64,
