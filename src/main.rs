@@ -13,10 +13,7 @@ use crate::transports::TransportType;
 async fn main() -> tokio::io::Result<()> {
     let config = config::Settings::load().expect("Failed to load config, nothing to do");
     println!("{:?}", config);
-    let message_generator = Arc::new(
-        generators::MessageGenerator::new(&config.message_file)
-            .expect("Failed to load message file"),
-    );
+    let message_generator = Arc::new(generators::RandomStringGenerator::new());
 
     // spawn each sender as a separate task and collect their handles
     let mut handles = Vec::new();
@@ -25,18 +22,34 @@ async fn main() -> tokio::io::Result<()> {
         for _ in 0..num_senders {
             let transport = match sender_config.protocol.as_ref() {
                 "tcp" => match sender_config.tls {
-                    true => TransportType::TcpTls(transports::tcp_tls::TcpTlsTransport::new(sender_config.host.clone(), sender_config.port).await?),
-                    false => TransportType::Tcp(transports::tcp::TcpTransport::new(sender_config.host.clone(), sender_config.port).await?),
+                    true => TransportType::TcpTls(
+                        transports::tcp_tls::TcpTlsTransport::new(
+                            sender_config.host.clone(),
+                            sender_config.port,
+                        )
+                        .await?,
+                    ),
+                    false => TransportType::Tcp(
+                        transports::tcp::TcpTransport::new(
+                            sender_config.host.clone(),
+                            sender_config.port,
+                        )
+                        .await?,
+                    ),
                 },
-                "udp" => {
-                    TransportType::Udp(transports::udp::UdpTransport::new(sender_config.host.clone(), sender_config.port).await?)
-                }
+                "udp" => TransportType::Udp(
+                    transports::udp::UdpTransport::new(
+                        sender_config.host.clone(),
+                        sender_config.port,
+                    )
+                    .await?,
+                ),
                 _ => panic!("Unknown protocol: {}", sender_config.protocol),
             };
             let generator = match sender_config.message_type.as_ref() {
-                "syslog3164" => crate::generators::Syslog3164EventGenerator {
-                    message_generator: message_generator.clone(),
-                },
+                "syslog3164" => {
+                    generators::Syslog3164EventGenerator::new(message_generator.clone())
+                }
                 _ => panic!("Unknown message type: {}", sender_config.message_type),
             };
             let config = sender::SenderConfig {

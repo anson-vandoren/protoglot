@@ -15,6 +15,4 @@
       "batchDelay": 10000, // delay in milliseconds between batches
     }
   ],
-  // file containing newline-separated strings to use as the message/raw field when appropriate
-  "messageFile": "config/reticulating_splines.txt"
 }

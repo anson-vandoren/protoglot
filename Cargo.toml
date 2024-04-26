@@ -15,3 +15,4 @@ webpki-roots = "0.26.1"
 rand = "0.8.5"
 chrono = "0.4.38"
 config = "0.14.0"
+uuid = { version = "1.8.0", features = ["v4"] }

@@ -4,7 +4,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Settings {
     pub senders: Vec<SenderSettings>,
-    pub message_file: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

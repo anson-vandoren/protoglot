@@ -3,10 +3,10 @@ use std::time::Duration;
 use crate::{generators::EventGenerator, transports::Transport};
 
 pub struct SenderConfig {
-    pub rate: u64, // events per second
-    pub num_batches: u64, // number of batches to send, 0 means run forever
+    pub rate: u64,             // events per second
+    pub num_batches: u64,      // number of batches to send, 0 means run forever
     pub events_per_batch: u64, // number of events per batch
-    pub batch_delay: u64, // delay between batches in milliseconds
+    pub batch_delay: u64,      // delay between batches in milliseconds
 }
 
 pub struct Sender<T: Transport, G: EventGenerator> {
@@ -15,7 +15,6 @@ pub struct Sender<T: Transport, G: EventGenerator> {
     pub config: SenderConfig,
     batches_sent: u64,
 }
-
 
 impl<T, G> Sender<T, G>
 where
@@ -35,7 +34,7 @@ where
             }
             self.batches_sent += 1;
 
-            if self.config.batch_delay > 0  && self.batches_sent < self.config.num_batches {
+            if self.config.batch_delay > 0 && self.batches_sent < self.config.num_batches {
                 tokio::time::sleep(Duration::from_millis(self.config.batch_delay)).await;
             }
         }
