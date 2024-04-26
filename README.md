@@ -9,7 +9,7 @@ if you stick a Babel fish in your ear you can instantly understand anything said
 language. The speech patterns you actually hear decode the brainwave matrix which has been fed into your
 mind by your Babel fish."
 
-Of course, since this will send and receive from Cribl Stream, it needed fewer vowels. And so here we are...
+Of course, since this tool is targeted specifically at Cribl, it needed fewer vowels. And so here we are...
 
 # What's it do?
 
@@ -20,28 +20,25 @@ Cribl Stream while also absorbing the unconscious mental frequencies emitted by 
 
 # Components:
 
-## Fake data absorber
-
-- Scours the best parts of the internet for amusing text from which to synthesize log-type messages
-- Combines the log message with other fields requested by its configuration such as:
-  - Timestamp
-  - Hostname
-  - Source
-  - Sourcetype
-  - Index
-  - PRI
-  - PID
-  - Application name
-  - Event ID
-  - Version
-  - Message
-- Data absorbers can be configured for a maximum throughput specified in events per second
-- Data absorbers will have a mechanism to modulate the actual throughput, up to the maximum,
-  based on backpressure signals.
-
 ## Emitters
 
 - Emitters are composed of:
   - A data generator
   - An event formatter/serializer
   - A transport
+- Emitters can be configured to send events:
+  - At a configurable rate in events per second
+  - For a configurable number of events per batch
+  - For a configurable number of batches before exiting (or can run forever)
+  - With a configurable delay between batches of events
+  - With or without TLS support (TCP only, HTTP in the future)
+  - Over TCP, UDP, or HTTP (HTTP support is not yet implemented)
+  - To a configurable IP/port
+  - With various event formats:
+    - Syslog 3164
+    - Syslog 5424 (octet-count framing coming soon)
+    - ... more to come ...
+
+## Absorbers
+
+TODO: Not yet implemented
