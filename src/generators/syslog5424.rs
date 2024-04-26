@@ -1,46 +1,47 @@
 use std::sync::Arc;
 
-use super::{event::EventGenerator, Event, RandomStringGenerator};
+use super::{Event, EventGenerator, RandomStringGenerator};
 
 use chrono;
 use rand::Rng;
 use uuid::Uuid;
 
-pub struct Syslog3164 {
+pub struct Syslog5424 {
     pub timestamp: chrono::DateTime<chrono::Utc>,
     pub message: String,
     pub facility: u8,
     pub severity: u8,
     pub app_name: String,
-    pub pid: Option<u16>,
+    pub pid: u16,
     pub hostname: String,
 }
 
-impl Event for Syslog3164 {
+impl Event for Syslog5424 {
     fn serialize(&self) -> Vec<u8> {
-        // Return a valid RFC 3164 syslog message
-        let time_string = self.timestamp.format("%b %e %T").to_string();
-        let pid = self.pid.unwrap_or(0);
+        // Return a valid RFC 5424 syslog message
+        let time_string = self.timestamp.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string();
 
         format!(
-            "<{}>{} {} {}[{}]: {}\n",
+            "<{}>1 {} {} {} {} {} {} {}\n",
             self.facility * 8 + self.severity,
             time_string,
             self.hostname,
             self.app_name,
-            pid,
+            self.pid,
+            "-", // no message id
+            "-", // no structured data
             self.message
         )
         .into_bytes()
     }
 }
 
-pub struct Syslog3164EventGenerator {
+pub struct Syslog5424EventGenerator {
     pub message_generator: Arc<RandomStringGenerator>,
     message_index: u64,
 }
 
-impl Syslog3164EventGenerator {
+impl Syslog5424EventGenerator {
     pub fn new(message_generator: Arc<RandomStringGenerator>) -> Self {
         Self {
             message_generator,
@@ -49,7 +50,7 @@ impl Syslog3164EventGenerator {
     }
 }
 
-impl EventGenerator for Syslog3164EventGenerator {
+impl EventGenerator for Syslog5424EventGenerator {
     fn generate(&mut self) -> Box<dyn Event + Send> {
         let mut rng = rand::thread_rng();
         let message = self.message_generator.generate_message();
@@ -61,13 +62,13 @@ impl EventGenerator for Syslog3164EventGenerator {
             message
         );
         self.message_index += 1;
-        Box::new(Syslog3164 {
+        Box::new(Syslog5424 {
             timestamp: chrono::Utc::now(),
             message,
-            facility: rng.gen_range(0..24),
-            severity: rng.gen_range(0..8),
+            facility: 1, // user-level messages
+            severity: 6, // informational severity
             app_name: self.message_generator.generate_appname(),
-            pid: Some(rng.gen_range(0..std::u16::MAX)),
+            pid: rng.gen_range(0..std::u16::MAX),
             hostname: self.message_generator.generate_hostname(),
         })
     }

@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use sender::Sender;
 
-use crate::transports::TransportType;
+use crate::{generators::EventType, transports::TransportType};
 
 #[tokio::main]
 async fn main() -> tokio::io::Result<()> {
@@ -48,7 +48,14 @@ async fn main() -> tokio::io::Result<()> {
             };
             let generator = match sender_config.message_type.as_ref() {
                 "syslog3164" => {
-                    generators::Syslog3164EventGenerator::new(message_generator.clone())
+                    EventType::Syslog3164(
+                        generators::Syslog3164EventGenerator::new(message_generator.clone())
+                    )
+                }
+                "syslog5424" => {
+                    EventType::Syslog5424(
+                        generators::Syslog5424EventGenerator::new(message_generator.clone())
+                    )
                 }
                 _ => panic!("Unknown message type: {}", sender_config.message_type),
             };

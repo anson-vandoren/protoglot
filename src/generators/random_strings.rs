@@ -1,13 +1,6 @@
 use rand::prelude::*;
 use std::sync::Arc;
 
-pub trait Event {
-    fn serialize(&self) -> Vec<u8>;
-}
-
-pub trait EventGenerator {
-    fn generate(&mut self) -> Box<dyn Event + Send>;
-}
 
 pub struct RandomStringGenerator {
     messages: Arc<Vec<String>>,
