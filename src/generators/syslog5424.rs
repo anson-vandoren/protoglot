@@ -73,3 +73,25 @@ impl EventGenerator for Syslog5424EventGenerator {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::TimeZone;
+
+    #[test]
+    fn test_serialization() {
+        let event = Syslog5424 {
+            timestamp: chrono::Utc.with_ymd_and_hms(2024, 7, 8, 9, 10, 11).unwrap(),
+            message: "Hello, world!".to_string(),
+            facility: 1,
+            severity: 6,
+            app_name: "test".to_string(),
+            pid: 1234,
+            hostname: "localhost".to_string(),
+        };
+
+        let serialized = String::from_utf8(event.serialize()).unwrap();
+        assert_eq!(serialized, "<14>1 2024-07-08T09:10:11.000Z localhost test 1234 - - Hello, world!\n");
+    }
+}
