@@ -16,14 +16,34 @@ pub struct EmitterSettings {
     pub tls: bool,
     pub protocol: String,
     pub message_type: String,
+    #[serde(default = "default_num_emitters")]
     pub num_emitters: u64,
+    #[serde(default = "default_events_per_batch")]
     pub events_per_batch: u64,
+    #[serde(default = "default_num_batches")]
     pub num_batches: u64,
+    #[serde(default = "default_batch_delay")]
     pub batch_delay: u64,
 }
 
 fn default_tls() -> bool {
-    true
+    false
+}
+
+fn default_batch_delay() -> u64 {
+    0
+}
+
+fn default_num_batches() -> u64 {
+    1
+}
+
+fn default_events_per_batch() -> u64 {
+    10000
+}
+
+fn default_num_emitters() -> u64 {
+    1
 }
 
 impl Settings {
