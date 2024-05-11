@@ -3,7 +3,7 @@
     {
       "host": "example.com", // FQDN or IP address
       "port": 514,
-      "tls": true, // defaults to true if omitted
+      "tls": false, // defaults to false if omitted
       "protocol": "tcp", // "tcp" or "udp"
       "rate": 1000, // in events per second
       // currently supported message types:

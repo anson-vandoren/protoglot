@@ -5,7 +5,6 @@ authors = ["Anson VanDoren <anson@ansonvandoren.com>"]
 edition = "2021"
 description = "A data generator & load tool, mostly built for testing Cribl Stream"
 license = "MIT"
-license-file = "LICENSE"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -20,3 +19,4 @@ rand = "0.8.5"
 chrono = "0.4.38"
 config = "0.14.0"
 uuid = { version = "1.8.0", features = ["v4"] }
+clap = { version = "4.5.4", features = ["derive"] }
