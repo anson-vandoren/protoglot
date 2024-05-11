@@ -19,6 +19,22 @@ impl std::fmt::Display for Protocol {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, ValueEnum, Clone)]
+enum MessageType {
+    Syslog3164,
+    Syslog5424,
+}
+
+impl std::fmt::Display for MessageType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            MessageType::Syslog3164 => "syslog3164",
+            MessageType::Syslog5424 => "syslog5424",
+        };
+        s.fmt(f)
+    }
+}
+
 /// CLI arguments
 #[derive(Parser, Serialize, Deserialize, Debug)]
 #[command(version, about)]
@@ -37,35 +53,35 @@ struct CliArgs {
 
     /// Rate in events per second
     #[arg(short, long, default_value = "1000")]
-    rate: Option<u64>,
+    rate: u64,
 
     /// Use TLS
     #[arg(short, long, default_value = "false")]
-    tls: Option<bool>,
+    tls: bool,
 
     /// Protocol to use
-    #[arg(short = 'P', long, default_value = "tcp")]
-    protocol: Option<Protocol>,
+    #[arg(short = 'P', long, default_value_t = Protocol::Tcp)]
+    protocol: Protocol,
 
     /// Message type
-    #[arg(short, long, default_value = "syslog3164")]
-    message_type: Option<String>,
+    #[arg(short, long, default_value_t = MessageType::Syslog3164)]
+    message_type: MessageType,
 
     /// Number of emitters to run in parallel
     #[arg(long = "emitters", default_value = "1")]
-    num_emitters: Option<u64>,
+    num_emitters: u64,
 
     /// Number of events per batch
     #[arg(long = "events", default_value = "10000")]
-    events_per_batch: Option<u64>,
+    events_per_batch: u64,
 
     /// Number of batches to send
     #[arg(long = "batches", default_value = "1")]
-    num_batches: Option<u64>,
+    num_batches: u64,
 
     /// Delay between batches in milliseconds
     #[arg(long, default_value = "0")]
-    batch_delay: Option<u64>,
+    batch_delay: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -124,6 +140,14 @@ impl Settings {
                 .add_source(config::Environment::with_prefix("BABL"));
             let settings: Settings = builder.build()?.try_deserialize()?;
             return Ok(settings);
+        } else if (args.host.is_some() && args.port.is_none()) || (args.port.is_some() && args.host.is_none()) {
+            if args.host.is_some() {
+                let msg = format!("Host (-H) specified without port (-p). host = {}", args.host.unwrap());
+                return Err(config::ConfigError::Message(msg));
+            } else {
+                let msg = format!("Port (-p) specified without host (-H). port = {}", args.port.unwrap());
+                return Err(config::ConfigError::Message(msg));
+            }
         } else if args.host.is_some() && args.port.is_some() {
             let host = args.host.unwrap();
             let port = args.port.unwrap();
@@ -131,14 +155,14 @@ impl Settings {
             let emitter = EmitterSettings {
                 host,
                 port,
-                rate: args.rate.unwrap(),
-                tls: args.tls.unwrap(),
-                protocol: args.protocol.unwrap().to_string(),
-                message_type: args.message_type.unwrap(),
-                num_emitters: args.num_emitters.unwrap(),
-                events_per_batch: args.events_per_batch.unwrap(),
-                num_batches: args.num_batches.unwrap(),
-                batch_delay: args.batch_delay.unwrap(),
+                rate: args.rate,
+                tls: args.tls,
+                protocol: args.protocol.to_string(),
+                message_type: args.message_type.to_string(),
+                num_emitters: args.num_emitters,
+                events_per_batch: args.events_per_batch,
+                num_batches: args.num_batches,
+                batch_delay: args.batch_delay,
             };
             let settings = Settings {
                 emitters: vec![emitter],

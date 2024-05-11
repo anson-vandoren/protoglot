@@ -1,3 +1,5 @@
+use std::fmt;
+
 pub mod http;
 pub mod tcp;
 pub mod tcp_tls;
@@ -24,4 +26,14 @@ pub trait Transport: Send {
         &mut self,
         data: Vec<u8>,
     ) -> impl std::future::Future<Output = tokio::io::Result<()>> + Send;
+}
+
+impl fmt::Display for TransportType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TransportType::Tcp(transport) => write!(f, "{}", transport),
+            TransportType::TcpTls(transport) => write!(f, "{}", transport),
+            TransportType::Udp(transport) => write!(f, "{}", transport),
+        }
+    }
 }

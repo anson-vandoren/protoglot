@@ -6,7 +6,7 @@ mod transports;
 use std::sync::Arc;
 
 use emitter::Emitter;
-use log::info;
+use log::{error, info};
 
 use crate::{generators::EventType, transports::TransportType};
 
@@ -14,7 +14,10 @@ use crate::{generators::EventType, transports::TransportType};
 async fn main() -> tokio::io::Result<()> {
     env_logger::init();
 
-    let config = config::Settings::load().expect("Failed to load config, nothing to do");
+    let config = config::Settings::load().unwrap_or_else(|err| {
+        error!("Failed to load configuration: {}", err);
+        std::process::exit(1);
+    });
     if std::env::var("RUST_LOG").is_err() {
         println!("Resolved configuration, starting senders. Set RUST_LOG=debug to see logs.");
     }
@@ -74,7 +77,10 @@ async fn main() -> tokio::io::Result<()> {
             let mut emitter = Emitter::new(transport, generator, config);
 
             handles.push(tokio::spawn(async move {
-                emitter.run().await.expect("Failed to run emitter");
+                match emitter.run().await {
+                    Ok(_) => info!(emitter = emitter.transport.to_string(); "Emitter completed successfully"),
+                    Err(err) => error!("Emitter failed: {}", err),
+                }
             }));
         }
     }
