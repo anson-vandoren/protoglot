@@ -1,5 +1,7 @@
 use std::fmt;
 
+use log::error;
+
 use super::Transport;
 
 pub struct TcpTransport {
@@ -11,8 +13,13 @@ pub struct TcpTransport {
 impl TcpTransport {
     pub async fn new(fqdn: String, port: u16) -> tokio::io::Result<Self> {
         let addr = format!("{}:{}", fqdn, port);
-        let stream = tokio::net::TcpStream::connect(addr).await?;
-        Ok(Self { fqdn, port, stream })
+        match tokio::net::TcpStream::connect(&addr).await {
+            Ok(stream) => Ok(Self { fqdn, port, stream }),
+            Err(e) => {
+                error!("Failed to connect to {}: {}", addr, e);
+                Err(e)
+            },
+        }
     }
 }
 
