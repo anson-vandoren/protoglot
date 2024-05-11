@@ -6,13 +6,19 @@ mod transports;
 use std::sync::Arc;
 
 use emitter::Emitter;
+use log::info;
 
 use crate::{generators::EventType, transports::TransportType};
 
 #[tokio::main]
 async fn main() -> tokio::io::Result<()> {
+    env_logger::init();
+
     let config = config::Settings::load().expect("Failed to load config, nothing to do");
-    println!("{:?}", config);
+    if std::env::var("RUST_LOG").is_err() {
+        println!("Resolved configuration, starting senders. Set RUST_LOG=debug to see logs.");
+    }
+    info!(config:serde; "Resolved configuration");
     let message_generator = Arc::new(generators::RandomStringGenerator::new());
 
     // spawn each emitter as a separate task and collect their handles
@@ -77,5 +83,6 @@ async fn main() -> tokio::io::Result<()> {
     for handle in handles {
         handle.await.expect("Failed to await emitter");
     }
+    println!("All emitters completed, exiting...");
     Ok(())
 }

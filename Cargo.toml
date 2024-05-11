@@ -3,7 +3,7 @@ name = "bablfsh"
 version = "0.1.0"
 authors = ["Anson VanDoren <anson@ansonvandoren.com>"]
 edition = "2021"
-description = "A data generator & load tool, mostly built for testing Cribl Stream"
+description = "A data generator & load tool, mostly built for testing Cribl Stream\nSet RUST_LOG=[error|warn|info|debug|trace] to see more output."
 license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -20,3 +20,5 @@ chrono = "0.4.38"
 config = "0.14.0"
 uuid = { version = "1.8.0", features = ["v4"] }
 clap = { version = "4.5.4", features = ["derive"] }
+log = { version = "0.4.21", features = ["kv", "kv_serde"] }
+env_logger = { version = "0.11.3", features = ["unstable-kv"] }

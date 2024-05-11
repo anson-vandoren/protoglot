@@ -1,5 +1,6 @@
 use clap::{Parser, ValueEnum};
 use config;
+use log::{debug, info};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, ValueEnum, Clone)]
@@ -18,7 +19,7 @@ impl std::fmt::Display for Protocol {
     }
 }
 
-// CLI arguments
+/// CLI arguments
 #[derive(Parser, Serialize, Deserialize, Debug)]
 #[command(version, about)]
 struct CliArgs {
@@ -43,7 +44,7 @@ struct CliArgs {
     tls: Option<bool>,
 
     /// Protocol to use
-    #[arg(short = 'P', long)]
+    #[arg(short = 'P', long, default_value = "tcp")]
     protocol: Option<Protocol>,
 
     /// Message type
@@ -115,19 +116,21 @@ fn default_num_emitters() -> u64 {
 impl Settings {
     pub fn load() -> Result<Self, config::ConfigError> {
         let args = CliArgs::parse();
-        println!("{:?}", args);
+        debug!(args:serde; "CLI args received");
         if args.file.is_some() {
-            println!("Loading settings from file {:?}", args.file.as_ref().unwrap());
+            info!(file = args.file.as_ref().unwrap().to_str(); "Loading settings from specified file:");
             let builder = config::Config::builder()
                 .add_source(config::File::from(args.file.unwrap()))
                 .add_source(config::Environment::with_prefix("BABL"));
             let settings: Settings = builder.build()?.try_deserialize()?;
             return Ok(settings);
         } else if args.host.is_some() && args.port.is_some() {
-            println!("Loading settings from CLI arguments");
+            let host = args.host.unwrap();
+            let port = args.port.unwrap();
+            info!(host, port; "No config file specified, using CLI args as settings");
             let emitter = EmitterSettings {
-                host: args.host.unwrap(),
-                port: args.port.unwrap(),
+                host,
+                port,
                 rate: args.rate.unwrap(),
                 tls: args.tls.unwrap(),
                 protocol: args.protocol.unwrap().to_string(),
@@ -142,9 +145,9 @@ impl Settings {
             };
             return Ok(settings);
         } else {
-            println!("Loading settings from default and local config files");
+            info!("Looking for config files in default locations");
             let builder = config::Config::builder()
-                .add_source(config::File::with_name("config/default"))
+                .add_source(config::File::with_name("config/default").required(false))
                 .add_source(config::File::with_name("bablfsh").required(false))
                 .add_source(config::File::with_name("config/local").required(false))
                 .add_source(config::Environment::with_prefix("BABL"));
