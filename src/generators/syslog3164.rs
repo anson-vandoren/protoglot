@@ -80,7 +80,9 @@ mod tests {
     #[test]
     fn test_serialization() {
         let event = Syslog3164 {
-            timestamp: chrono::Utc.with_ymd_and_hms(20024, 7, 8, 9, 10, 11).unwrap(),
+            timestamp: chrono::Utc
+                .with_ymd_and_hms(20024, 7, 8, 9, 10, 11)
+                .unwrap(),
             message: "test message".to_string(),
             facility: 1,
             severity: 5,
@@ -89,6 +91,9 @@ mod tests {
             hostname: "test_host".to_string(),
         };
         let serialized = String::from_utf8(event.serialize()).unwrap();
-        assert_eq!(serialized, "<13>Jul  8 09:10:11 test_host test_app[1234]: test message\n");
+        assert_eq!(
+            serialized,
+            "<13>Jul  8 09:10:11 test_host test_app[1234]: test message\n"
+        );
     }
 }

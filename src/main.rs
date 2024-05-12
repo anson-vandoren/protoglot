@@ -1,6 +1,6 @@
 mod config;
-mod generators;
 mod emitter;
+mod generators;
 mod transports;
 
 use std::sync::Arc;
@@ -8,7 +8,11 @@ use std::sync::Arc;
 use emitter::Emitter;
 use log::{error, info};
 
-use crate::{config::{MessageType, Protocol}, generators::EventType, transports::TransportType};
+use crate::{
+    config::{MessageType, Protocol},
+    generators::EventType,
+    transports::TransportType,
+};
 
 #[tokio::main]
 async fn main() -> tokio::io::Result<()> {
@@ -35,47 +39,37 @@ async fn main() -> tokio::io::Result<()> {
                         config.host.clone(),
                         config.port,
                     )
-                    .await {
+                    .await
+                    {
                         Ok(transport) => transport,
                         Err(_err) => {
                             // error already logged in TcpTlsTransport
                             continue;
                         }
-                    }
+                    },
                 ),
                 false => TransportType::Tcp(
-                    match transports::tcp::TcpTransport::new(
-                        config.host.clone(),
-                        config.port,
-                    )
-                    .await {
+                    match transports::tcp::TcpTransport::new(config.host.clone(), config.port).await
+                    {
                         Ok(transport) => transport,
                         Err(_err) => {
                             // error already logged in TcpTransport
                             continue;
                         }
-                    }
+                    },
                 ),
             },
             Protocol::Udp => TransportType::Udp(
-                transports::udp::UdpTransport::new(
-                    config.host.clone(),
-                    config.port,
-                )
-                .await?,
+                transports::udp::UdpTransport::new(config.host.clone(), config.port).await?,
             ),
         };
         let generator = match config.message_type {
-            MessageType::Syslog3164 => {
-                EventType::Syslog3164(
-                    generators::Syslog3164EventGenerator::new(message_generator.clone())
-                )
-            }
-            MessageType::Syslog5424 => {
-                EventType::Syslog5424(
-                    generators::Syslog5424EventGenerator::new(message_generator.clone())
-                )
-            }
+            MessageType::Syslog3164 => EventType::Syslog3164(
+                generators::Syslog3164EventGenerator::new(message_generator.clone()),
+            ),
+            MessageType::Syslog5424 => EventType::Syslog5424(
+                generators::Syslog5424EventGenerator::new(message_generator.clone()),
+            ),
         };
         let config = emitter::EmitterConfig {
             rate: config.rate,
@@ -87,7 +81,9 @@ async fn main() -> tokio::io::Result<()> {
 
         handles.push(tokio::spawn(async move {
             match emitter.run().await {
-                Ok(_) => info!(emitter = emitter.transport.to_string(); "Emitter completed successfully"),
+                Ok(_) => {
+                    info!(emitter = emitter.transport.to_string(); "Emitter completed successfully")
+                }
                 Err(err) => error!("Emitter failed: {}", err),
             }
         }));

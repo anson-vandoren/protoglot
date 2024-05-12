@@ -1,7 +1,6 @@
 use rand::prelude::*;
 use std::sync::Arc;
 
-
 pub struct RandomStringGenerator {
     messages: Arc<Vec<String>>,
     hostnames: Arc<Vec<String>>,

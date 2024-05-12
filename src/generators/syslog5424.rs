@@ -92,6 +92,9 @@ mod tests {
         };
 
         let serialized = String::from_utf8(event.serialize()).unwrap();
-        assert_eq!(serialized, "<14>1 2024-07-08T09:10:11.000Z localhost test 1234 - - Hello, world!\n");
+        assert_eq!(
+            serialized,
+            "<14>1 2024-07-08T09:10:11.000Z localhost test 1234 - - Hello, world!\n"
+        );
     }
 }

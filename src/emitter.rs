@@ -3,10 +3,10 @@ use std::time::Duration;
 use crate::{generators::EventGenerator, transports::Transport};
 
 pub struct EmitterConfig {
-    pub rate: u64,              // events per second
-    pub num_cycles: u64,        // number of cycles to send, 0 means run forever
+    pub rate: u64,             // events per second
+    pub num_cycles: u64,       // number of cycles to send, 0 means run forever
     pub events_per_cycle: u64, // number of events per cycles
-    pub cycle_delay: u64,       // delay between cycles in milliseconds
+    pub cycle_delay: u64,      // delay between cycles in milliseconds
 }
 
 pub struct Emitter<T: Transport, G: EventGenerator> {

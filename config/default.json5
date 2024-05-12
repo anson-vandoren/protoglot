@@ -1,6 +1,6 @@
 {
-  "host": "example.com", // FQDN or IP address
-  "port": 514,
+  "host": "localhost", // FQDN or IP address
+  "port": 9514,
   "tls": false, // defaults to false if omitted
   "protocol": "tcp", // "tcp" or "udp"
   "rate": 1000, // in events per second

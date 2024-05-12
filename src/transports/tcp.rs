@@ -18,7 +18,7 @@ impl TcpTransport {
             Err(e) => {
                 error!("Failed to connect to {}: {}", addr, e);
                 Err(e)
-            },
+            }
         }
     }
 }
