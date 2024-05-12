@@ -97,7 +97,7 @@ async fn main() -> tokio::io::Result<()> {
         }
     }
 
-    // wait for all emitters to complete (i.e., in our case, run forever)
+    // wait for all emitters to complete
     for handle in handles {
         handle.await.expect("Failed to await emitter");
     }
