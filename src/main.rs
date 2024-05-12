@@ -82,9 +82,9 @@ async fn main() -> tokio::io::Result<()> {
             };
             let config = emitter::EmitterConfig {
                 rate: emitter_config.rate,
-                num_batches: emitter_config.num_batches,
-                events_per_batch: emitter_config.events_per_batch,
-                batch_delay: emitter_config.batch_delay,
+                num_cycles: emitter_config.num_cycles,
+                events_per_cycle: emitter_config.events_per_cycle,
+                cycle_delay: emitter_config.cycle_delay,
             };
             let mut emitter = Emitter::new(transport, generator, config);
 

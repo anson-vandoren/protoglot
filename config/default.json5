@@ -11,9 +11,9 @@
       // - "syslog5424": RFC 5424 syslog message
       "messageType": "syslog3164",
       "numEmitters": 1, // number of concurrent emitters to run, each at the EPS rate above
-      "eventsPerBatch": 10000, // number of events to send in each batch
-      "numBatches": 1, // number of batches to send, use 0 for infinite
-      "batchDelay": 10000, // delay in milliseconds between batches
+      "eventsPerCycle": 10000, // number of events to send in each cycle
+      "numCycles": 1, // number of cycles to send, use 0 for infinite
+      "cycleDelay": 10000, // delay in milliseconds between cycles
     }
   ],
 }

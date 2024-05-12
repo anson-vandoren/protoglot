@@ -41,9 +41,9 @@ Cribl Stream while also absorbing the unconscious mental frequencies emitted by 
   - A transport
 - Emitters can be configured to send events:
   - At a configurable rate in events per second
-  - For a configurable number of events per batch
-  - For a configurable number of batches before exiting (or can run forever)
-  - With a configurable delay between batches of events
+  - For a configurable number of events per cycle
+  - For a configurable number of cycles before exiting (or can run forever)
+  - With a configurable delay between cycles of events
   - With or without TLS support (TCP only, HTTP in the future)
   - Over TCP, UDP, or HTTP (HTTP support is not yet implemented)
   - To a configurable IP/port

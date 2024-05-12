@@ -71,17 +71,17 @@ struct CliArgs {
     #[arg(long = "emitters", default_value = "1")]
     num_emitters: u64,
 
-    /// Number of events per batch
+    /// Number of events per cycle
     #[arg(long = "events", default_value = "10000")]
-    events_per_batch: u64,
+    events_per_cycle: u64,
 
-    /// Number of batches to send
-    #[arg(long = "batches", default_value = "1")]
-    num_batches: u64,
+    /// Number of cycles to send
+    #[arg(long = "cycles", default_value = "1")]
+    num_cycles: u64,
 
-    /// Delay between batches in milliseconds
+    /// Delay between cycles in milliseconds
     #[arg(long, default_value = "0")]
-    batch_delay: u64,
+    cycle_delay: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -101,27 +101,27 @@ pub struct EmitterSettings {
     pub message_type: String,
     #[serde(default = "default_num_emitters")]
     pub num_emitters: u64,
-    #[serde(default = "default_events_per_batch")]
-    pub events_per_batch: u64,
-    #[serde(default = "default_num_batches")]
-    pub num_batches: u64,
-    #[serde(default = "default_batch_delay")]
-    pub batch_delay: u64,
+    #[serde(default = "default_events_per_cycle")]
+    pub events_per_cycle: u64,
+    #[serde(default = "default_num_cycles")]
+    pub num_cycles: u64,
+    #[serde(default = "default_cycle_delay")]
+    pub cycle_delay: u64,
 }
 
 fn default_tls() -> bool {
     false
 }
 
-fn default_batch_delay() -> u64 {
+fn default_cycle_delay() -> u64 {
     0
 }
 
-fn default_num_batches() -> u64 {
+fn default_num_cycles() -> u64 {
     1
 }
 
-fn default_events_per_batch() -> u64 {
+fn default_events_per_cycle() -> u64 {
     10000
 }
 
@@ -160,9 +160,9 @@ impl Settings {
                 protocol: args.protocol.to_string(),
                 message_type: args.message_type.to_string(),
                 num_emitters: args.num_emitters,
-                events_per_batch: args.events_per_batch,
-                num_batches: args.num_batches,
-                batch_delay: args.batch_delay,
+                events_per_cycle: args.events_per_cycle,
+                num_cycles: args.num_cycles,
+                cycle_delay: args.cycle_delay,
             };
             let settings = Settings {
                 emitters: vec![emitter],
