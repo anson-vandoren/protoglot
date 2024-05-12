@@ -32,18 +32,30 @@ async fn main() -> tokio::io::Result<()> {
             let transport = match emitter_config.protocol.as_ref() {
                 "tcp" => match emitter_config.tls {
                     true => TransportType::TcpTls(
-                        transports::tcp_tls::TcpTlsTransport::new(
+                        match transports::tcp_tls::TcpTlsTransport::new(
                             emitter_config.host.clone(),
                             emitter_config.port,
                         )
-                        .await?,
+                        .await {
+                            Ok(transport) => transport,
+                            Err(_err) => {
+                                // error already logged in TcpTlsTransport
+                                continue;
+                            }
+                        }
                     ),
                     false => TransportType::Tcp(
-                        transports::tcp::TcpTransport::new(
+                        match transports::tcp::TcpTransport::new(
                             emitter_config.host.clone(),
                             emitter_config.port,
                         )
-                        .await?,
+                        .await {
+                            Ok(transport) => transport,
+                            Err(_err) => {
+                                // error already logged in TcpTransport
+                                continue;
+                            }
+                        }
                     ),
                 },
                 "udp" => TransportType::Udp(
