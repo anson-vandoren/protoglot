@@ -4,7 +4,8 @@ use log::{debug, info};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, ValueEnum, Clone)]
-enum Protocol {
+#[serde(rename_all = "lowercase")]
+pub(crate) enum Protocol {
     Tcp,
     Udp,
 }
@@ -20,7 +21,8 @@ impl std::fmt::Display for Protocol {
 }
 
 #[derive(Serialize, Deserialize, Debug, ValueEnum, Clone)]
-enum MessageType {
+#[serde(rename_all = "lowercase")]
+pub(crate) enum MessageType {
     Syslog3164,
     Syslog5424,
 }
@@ -85,51 +87,21 @@ struct CliArgs {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct Settings {
-    pub emitters: Vec<EmitterSettings>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct EmitterSettings {
     pub host: String,
     pub port: u16,
     pub rate: u64,
-    #[serde(default = "default_tls")]
     pub tls: bool,
-    pub protocol: String,
-    pub message_type: String,
-    #[serde(default = "default_num_emitters")]
+    pub protocol: Protocol,
+    pub message_type: MessageType,
     pub num_emitters: u64,
-    #[serde(default = "default_events_per_cycle")]
     pub events_per_cycle: u64,
-    #[serde(default = "default_num_cycles")]
     pub num_cycles: u64,
-    #[serde(default = "default_cycle_delay")]
     pub cycle_delay: u64,
 }
 
-fn default_tls() -> bool {
-    false
-}
-
-fn default_cycle_delay() -> u64 {
-    0
-}
-
-fn default_num_cycles() -> u64 {
-    1
-}
-
-fn default_events_per_cycle() -> u64 {
-    10000
-}
-
-fn default_num_emitters() -> u64 {
-    1
-}
-
-impl Settings {
+impl EmitterSettings {
     pub fn load() -> Result<Self, config::ConfigError> {
         let args = CliArgs::parse();
         debug!(args:serde; "CLI args received");
@@ -138,7 +110,7 @@ impl Settings {
             let builder = config::Config::builder()
                 .add_source(config::File::from(args.file.unwrap()))
                 .add_source(config::Environment::with_prefix("BABL"));
-            let settings: Settings = builder.build()?.try_deserialize()?;
+            let settings: EmitterSettings = builder.build()?.try_deserialize()?;
             return Ok(settings);
         } else if (args.host.is_some() && args.port.is_none()) || (args.port.is_some() && args.host.is_none()) {
             if args.host.is_some() {
@@ -157,17 +129,14 @@ impl Settings {
                 port,
                 rate: args.rate,
                 tls: args.tls,
-                protocol: args.protocol.to_string(),
-                message_type: args.message_type.to_string(),
+                protocol: args.protocol,
+                message_type: args.message_type,
                 num_emitters: args.num_emitters,
                 events_per_cycle: args.events_per_cycle,
                 num_cycles: args.num_cycles,
                 cycle_delay: args.cycle_delay,
             };
-            let settings = Settings {
-                emitters: vec![emitter],
-            };
-            return Ok(settings);
+            return Ok(emitter);
         } else {
             info!("Looking for config files in default locations");
             let builder = config::Config::builder()
@@ -175,7 +144,7 @@ impl Settings {
                 .add_source(config::File::with_name("bablfsh").required(false))
                 .add_source(config::File::with_name("config/local").required(false))
                 .add_source(config::Environment::with_prefix("BABL"));
-            let settings: Settings = builder.build()?.try_deserialize()?;
+            let settings: EmitterSettings = builder.build()?.try_deserialize()?;
             return Ok(settings);
         }
     }

@@ -17,7 +17,7 @@ rustls = "0.23.5"
 webpki-roots = "0.26.1"
 rand = "0.8.5"
 chrono = "0.4.38"
-config = "0.14.0"
+config = { version = "0.13.4", default_features = false, features = ["toml", "json", "json5"] }
 uuid = { version = "1.8.0", features = ["v4"] }
 clap = { version = "4.5.4", features = ["derive"] }
 log = { version = "0.4.21", features = ["kv", "kv_serde"] }

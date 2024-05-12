@@ -8,13 +8,13 @@ use std::sync::Arc;
 use emitter::Emitter;
 use log::{error, info};
 
-use crate::{generators::EventType, transports::TransportType};
+use crate::{config::{MessageType, Protocol}, generators::EventType, transports::TransportType};
 
 #[tokio::main]
 async fn main() -> tokio::io::Result<()> {
     env_logger::init();
 
-    let config = config::Settings::load().unwrap_or_else(|err| {
+    let config = config::EmitterSettings::load().unwrap_or_else(|err| {
         error!("Failed to load configuration: {}", err);
         std::process::exit(1);
     });
@@ -26,75 +26,71 @@ async fn main() -> tokio::io::Result<()> {
 
     // spawn each emitter as a separate task and collect their handles
     let mut handles = Vec::new();
-    for emitter_config in config.emitters {
-        let num_emitters = emitter_config.num_emitters;
-        for _ in 0..num_emitters {
-            let transport = match emitter_config.protocol.as_ref() {
-                "tcp" => match emitter_config.tls {
-                    true => TransportType::TcpTls(
-                        match transports::tcp_tls::TcpTlsTransport::new(
-                            emitter_config.host.clone(),
-                            emitter_config.port,
-                        )
-                        .await {
-                            Ok(transport) => transport,
-                            Err(_err) => {
-                                // error already logged in TcpTlsTransport
-                                continue;
-                            }
-                        }
-                    ),
-                    false => TransportType::Tcp(
-                        match transports::tcp::TcpTransport::new(
-                            emitter_config.host.clone(),
-                            emitter_config.port,
-                        )
-                        .await {
-                            Ok(transport) => transport,
-                            Err(_err) => {
-                                // error already logged in TcpTransport
-                                continue;
-                            }
-                        }
-                    ),
-                },
-                "udp" => TransportType::Udp(
-                    transports::udp::UdpTransport::new(
-                        emitter_config.host.clone(),
-                        emitter_config.port,
+    let num_emitters = config.num_emitters;
+    for _ in 0..num_emitters {
+        let transport = match config.protocol {
+            Protocol::Tcp => match config.tls {
+                true => TransportType::TcpTls(
+                    match transports::tcp_tls::TcpTlsTransport::new(
+                        config.host.clone(),
+                        config.port,
                     )
-                    .await?,
+                    .await {
+                        Ok(transport) => transport,
+                        Err(_err) => {
+                            // error already logged in TcpTlsTransport
+                            continue;
+                        }
+                    }
                 ),
-                _ => panic!("Unknown protocol: {}", emitter_config.protocol),
-            };
-            let generator = match emitter_config.message_type.as_ref() {
-                "syslog3164" => {
-                    EventType::Syslog3164(
-                        generators::Syslog3164EventGenerator::new(message_generator.clone())
+                false => TransportType::Tcp(
+                    match transports::tcp::TcpTransport::new(
+                        config.host.clone(),
+                        config.port,
                     )
-                }
-                "syslog5424" => {
-                    EventType::Syslog5424(
-                        generators::Syslog5424EventGenerator::new(message_generator.clone())
-                    )
-                }
-                _ => panic!("Unknown message type: {}", emitter_config.message_type),
-            };
-            let config = emitter::EmitterConfig {
-                rate: emitter_config.rate,
-                num_cycles: emitter_config.num_cycles,
-                events_per_cycle: emitter_config.events_per_cycle,
-                cycle_delay: emitter_config.cycle_delay,
-            };
-            let mut emitter = Emitter::new(transport, generator, config);
+                    .await {
+                        Ok(transport) => transport,
+                        Err(_err) => {
+                            // error already logged in TcpTransport
+                            continue;
+                        }
+                    }
+                ),
+            },
+            Protocol::Udp => TransportType::Udp(
+                transports::udp::UdpTransport::new(
+                    config.host.clone(),
+                    config.port,
+                )
+                .await?,
+            ),
+        };
+        let generator = match config.message_type {
+            MessageType::Syslog3164 => {
+                EventType::Syslog3164(
+                    generators::Syslog3164EventGenerator::new(message_generator.clone())
+                )
+            }
+            MessageType::Syslog5424 => {
+                EventType::Syslog5424(
+                    generators::Syslog5424EventGenerator::new(message_generator.clone())
+                )
+            }
+        };
+        let config = emitter::EmitterConfig {
+            rate: config.rate,
+            num_cycles: config.num_cycles,
+            events_per_cycle: config.events_per_cycle,
+            cycle_delay: config.cycle_delay,
+        };
+        let mut emitter = Emitter::new(transport, generator, config);
 
-            handles.push(tokio::spawn(async move {
-                match emitter.run().await {
-                    Ok(_) => info!(emitter = emitter.transport.to_string(); "Emitter completed successfully"),
-                    Err(err) => error!("Emitter failed: {}", err),
-                }
-            }));
-        }
+        handles.push(tokio::spawn(async move {
+            match emitter.run().await {
+                Ok(_) => info!(emitter = emitter.transport.to_string(); "Emitter completed successfully"),
+                Err(err) => error!("Emitter failed: {}", err),
+            }
+        }));
     }
 
     // wait for all emitters to complete
