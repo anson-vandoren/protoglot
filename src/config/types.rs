@@ -1,7 +1,7 @@
 use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug, ValueEnum, Clone)]
+#[derive(Serialize, Deserialize, Debug, ValueEnum, Clone, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub(crate) enum Protocol {
     Tcp,
@@ -18,7 +18,7 @@ impl std::fmt::Display for Protocol {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, ValueEnum, Clone)]
+#[derive(Serialize, Deserialize, Debug, ValueEnum, Clone, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub(crate) enum MessageType {
     Syslog3164,

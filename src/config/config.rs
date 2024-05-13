@@ -1,6 +1,6 @@
 use clap::Parser;
-use eyre::{Result, Report};
 use directories::ProjectDirs;
+use eyre::{Report, Result};
 use figment::providers::{Env, Format, Serialized};
 use log::{debug, info};
 use serde::de::DeserializeOwned;
@@ -10,7 +10,7 @@ use super::cli::CliArgs;
 use super::{MessageType, Protocol};
 
 #[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all(deserialize = "camelCase"))]
+#[serde(rename_all = "camelCase")]
 pub struct EmitterSettings {
     pub host: String,
     pub port: u16,
@@ -45,7 +45,7 @@ impl EmitterSettings {
     pub fn load() -> Result<Self> {
         // The settings are loaded in the following order:
 
-        // 1. load defaults from file which should be baked into the binary
+        // 1. load defaults from file which will be baked into the binary
         let mut figment = figment::Figment::from(Serialized::defaults(EmitterSettings::new()?));
 
         // 2. load values from config directory, overlaying on defaults
@@ -84,7 +84,8 @@ impl EmitterSettings {
         figment = figment.merge(Serialized::defaults(args));
 
         println!("{:?}", figment);
+        debug!(figment:?; "Final configuration");
 
-        figment.extract().map_err(Report::new)
+        figment.extract().map_err(Report::new) // TODO: add figment context here
     }
 }
