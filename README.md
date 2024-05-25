@@ -26,6 +26,30 @@ Cribl Stream while also absorbing the unconscious mental frequencies emitted by 
 2. Clone this repo, then `cargo build --release` from the repo root.
 3. Copy the resultant binary from `target/release/bablfsh` to a location in your path.
 
+## Running from Docker
+
+If you don't want to or need to build the binary yourself, you can run it in a Docker container. The Docker image is available on Docker Hub at `ansonvandoren/bablfsh`. To run it, you can use the following command:
+
+```bash
+docker run --rm ansonvandoren/bablfsh --help
+```
+
+When running bablfsh in a Docker container, the configuration options and command line arguments below still apply, but you would need to mount a volume to the container to provide a config file. In this case it's easier to just use environment variables or command line arguments to configure the tool.
+
+**Examples**:
+
+```bash
+$ docker run --rm ansonvandoren/bablfsh --host 172.17.0.1 # or host.docker.internal for macfolk
+```
+
+or
+
+```bash
+$ docker run --rm -e BABL_host=172.17.0.1 ansonvandoren/bablfsh # or host.docker.internal for macfolk
+```
+
+__Note__: Environment variable naming is kind of borked right now and need some work. Currently, the `BABL_` prefix should be uppercase but the field name should be lowercase. This will be fixed in a future release.
+
 ## Running
 
 1. Run `bablfsh --help` to see the available options.
@@ -55,7 +79,9 @@ Cribl Stream while also absorbing the unconscious mental frequencies emitted by 
   c. On macOS, the path is `~/Library/Application Support/com.ansonvandoren.bablfsh/config.json5`
 
 4. If you pass a `--file` argument, bablfsh will read the config from that file instead of the default or system config file.
-5. Only one of the above config files will be used (in the order described), and whichever file is selected must be contain all fields present in the default config file. If you wish to override specific fields from the command line, you can do so with the appropriate flags as described in the help output.
+5. Only one of the above config files will be used (in the order described), and whichever file is selected must be contain all fields present in the default config file.
+6. You can override specific fields from the config using environment variables prefixed by `BABL_` and the field name in all caps. For example, to override the `host` field, you would set the `BABL_HOST` environment variable.
+7. If you wish to override specific fields from the command line, you can do so with the appropriate flags as described in the help output. Command line arguments will override both config files and environment variables.
 
 
 # Components:
