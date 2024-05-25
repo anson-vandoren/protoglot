@@ -22,14 +22,41 @@ Cribl Stream while also absorbing the unconscious mental frequencies emitted by 
 
 ## Building
 
-- TODO: Add detailed instructions for building. For now, you'll need a Rust toolchain installed, and then from the
-  repo root, run `cargo build --release`. The resultant binary will be in `target/release/bablfsh`.
+1. Install the Rust toolchain: https://www.rust-lang.org/tools/install
+2. Clone this repo, then `cargo build --release` from the repo root.
+3. Copy the resultant binary from `target/release/bablfsh` to a location in your path.
 
 ## Running
 
-- Better configuration to come, but for now either run the binary or `cargo run` from repo root. A config
-  file will be expected in `./config/default.json5` or `.config/local.json5` (JSON5 is a superset of JSON).
-  See the included `./config/default.json5` for an example configuration.
+1. Run `bablfsh --help` to see the available options.
+2. With no options, `bablfsh` will use the config found in the repo under `./config/default.json5` (which is bundled inside the binary itself at compile time):
+
+```json5
+{
+  "host": "localhost", // FQDN or IP address
+  "port": 9514,
+  "tls": false, // defaults to false if omitted
+  "protocol": "tcp", // "tcp" or "udp"
+  "rate": 1000, // in events per second
+  // currently supported message types:
+  // - "syslog3164": RFC 3164 syslog message
+  // - "syslog5424": RFC 5424 syslog message
+  "messageType": "syslog3164",
+  "numEmitters": 1, // number of concurrent emitters to run, each at the EPS rate above
+  "eventsPerCycle": 10000, // number of events to send in each cycle
+  "numCycles": 1, // number of cycles to send, use 0 for infinite
+  "cycleDelay": 10000, // delay in milliseconds between cycles
+}
+```
+
+3. If you have a JSON5 config file located in your system's config directories, that will be used in place of the default.
+  a. On Linux, the path is `~/.config/bablfsh/config.json5`
+  b. On Windows, the path is `C:\Users\<username>\AppData\Roaming\ansonvandoren\bablfsh\config\config.json5`
+  c. On macOS, the path is `~/Library/Application Support/com.ansonvandoren.bablfsh/config.json5`
+
+4. If you pass a `--file` argument, bablfsh will read the config from that file instead of the default or system config file.
+5. Only one of the above config files will be used (in the order described), and whichever file is selected must be contain all fields present in the default config file. If you wish to override specific fields from the command line, you can do so with the appropriate flags as described in the help output.
+
 
 # Components:
 
