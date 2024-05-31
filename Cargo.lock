@@ -131,29 +131,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bablfsh"
-version = "0.2.0"
-dependencies = [
- "chrono",
- "clap",
- "directories",
- "env_logger",
- "eyre",
- "figment",
- "json5",
- "log",
- "rand",
- "rustls",
- "rustls-native-certs",
- "serde",
- "serde_json",
- "tokio",
- "tokio-rustls",
- "uuid",
- "webpki-roots",
-]
-
-[[package]]
 name = "backtrace"
 version = "0.3.71"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -945,6 +922,29 @@ dependencies = [
  "syn",
  "version_check",
  "yansi",
+]
+
+[[package]]
+name = "protoglot"
+version = "0.2.0"
+dependencies = [
+ "chrono",
+ "clap",
+ "directories",
+ "env_logger",
+ "eyre",
+ "figment",
+ "json5",
+ "log",
+ "rand",
+ "rustls",
+ "rustls-native-certs",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-rustls",
+ "uuid",
+ "webpki-roots",
 ]
 
 [[package]]

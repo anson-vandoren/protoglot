@@ -1,5 +1,5 @@
 [package]
-name = "bablfsh"
+name = "protoglot"
 version = "0.2.0"
 authors = ["Anson VanDoren <anson@ansonvandoren.com>"]
 edition = "2021"

@@ -49,7 +49,7 @@ impl EmitterSettings {
         let mut figment = figment::Figment::from(Serialized::defaults(EmitterSettings::new()?));
 
         // 2. load values from config directory, overlaying on defaults
-        if let Some(proj_dirs) = ProjectDirs::from("com", "ansonvandoren", "bablfsh") {
+        if let Some(proj_dirs) = ProjectDirs::from("com", "ansonvandoren", "protoglot") {
             let config_file_path = proj_dirs.config_dir().join("config.json5");
             if config_file_path.exists() {
                 figment = figment.merge(Json5::file(&config_file_path));
@@ -78,7 +78,7 @@ impl EmitterSettings {
         }
 
         // 4. if env vars are provided, overlay those on defaults+configDir+file
-        figment = figment.merge(Env::prefixed("BABL_").lowercase(false));
+        figment = figment.merge(Env::prefixed("GLOT_").lowercase(false));
 
         // 5. if CLI args are provided, overlay those on defaults+configDir+file+env
         figment = figment.merge(Serialized::defaults(args));
