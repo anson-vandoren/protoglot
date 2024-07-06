@@ -1,7 +1,9 @@
+mod nd_json;
 mod random_strings;
 mod syslog3164;
 mod syslog5424;
 
+pub use nd_json::NdJsonEventGenerator;
 pub use random_strings::RandomStringGenerator;
 pub use syslog3164::Syslog3164EventGenerator;
 pub use syslog5424::Syslog5424EventGenerator;
@@ -13,6 +15,7 @@ pub trait Event {
 pub enum EventType {
     Syslog3164(Syslog3164EventGenerator),
     Syslog5424(Syslog5424EventGenerator),
+    NdJson(NdJsonEventGenerator),
 }
 
 impl EventGenerator for EventType {
@@ -20,6 +23,7 @@ impl EventGenerator for EventType {
         match self {
             EventType::Syslog3164(generator) => generator.generate(),
             EventType::Syslog5424(generator) => generator.generate(),
+            EventType::NdJson(generator) => generator.generate(),
         }
     }
 }

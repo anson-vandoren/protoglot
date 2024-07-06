@@ -70,6 +70,9 @@ async fn main() -> tokio::io::Result<()> {
             MessageType::Syslog5424 => EventType::Syslog5424(
                 generators::Syslog5424EventGenerator::new(message_generator.clone()),
             ),
+            MessageType::NdJson => EventType::NdJson(
+                generators::NdJsonEventGenerator::new(message_generator.clone()),
+            ),
         };
         let config = emitter::EmitterConfig {
             rate: config.rate,

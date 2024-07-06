@@ -23,6 +23,7 @@ impl std::fmt::Display for Protocol {
 pub(crate) enum MessageType {
     Syslog3164,
     Syslog5424,
+    NdJson,
 }
 
 impl std::fmt::Display for MessageType {
@@ -30,6 +31,7 @@ impl std::fmt::Display for MessageType {
         let s = match self {
             MessageType::Syslog3164 => "syslog3164",
             MessageType::Syslog5424 => "syslog5424",
+            MessageType::NdJson => "ndjson",
         };
         s.fmt(f)
     }
