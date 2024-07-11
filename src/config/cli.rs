@@ -60,4 +60,8 @@ pub(super) struct CliArgs {
     #[arg(long)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(super) cycle_delay: Option<u64>,
+
+    /// control output verbosity
+    #[arg(short, action = clap::ArgAction::Count)]
+    pub(super) verbose: u8,
 }

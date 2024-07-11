@@ -1,8 +1,10 @@
+use std::str::FromStr;
+
 use clap::Parser;
 use directories::ProjectDirs;
 use eyre::{Report, Result};
 use figment::providers::{Env, Format, Serialized};
-use log::{debug, info};
+use log::{debug, info, trace};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
@@ -43,6 +45,18 @@ impl figment::providers::Format for Json5 {
 
 impl EmitterSettings {
     pub fn load() -> Result<Self> {
+        let args = CliArgs::parse();
+        let verbosity = match args.verbose {
+            0 => "warn",
+            1 => "info",
+            2 => "debug",
+            3 => "trace",
+            _ => "warn",
+        };
+        env_logger::builder()
+            .filter_level(log::LevelFilter::from_str(verbosity).unwrap())
+            .init();
+
         // The settings are loaded in the following order:
 
         // 1. load defaults from file which will be baked into the binary
@@ -53,15 +67,17 @@ impl EmitterSettings {
             let config_file_path = proj_dirs.config_dir().join("config.json5");
             if config_file_path.exists() {
                 figment = figment.merge(Json5::file(&config_file_path));
-                info!(config_file_path:?; "Using config file");
+                info!("Using config file found at {:?}", config_file_path);
             } else {
-                info!(config_file_path:?; "No config file found, using defaults");
+                info!(
+                    "No config file found at {:?}, using defaults",
+                    config_file_path
+                );
             }
         } else {
             info!("No config directory found, using defaults");
         }
 
-        let args = CliArgs::parse();
         debug!(args:serde; "Parsed CLI args");
 
         // 3. if a file arg is provided, overlay that on defaults+configDir
@@ -83,9 +99,7 @@ impl EmitterSettings {
         // 5. if CLI args are provided, overlay those on defaults+configDir+file+env
         figment = figment.merge(Serialized::defaults(args));
 
-        println!("{:?}", figment);
-        debug!(figment:?; "Final configuration");
-
+        trace!(figment:?; "Final configuration");
         figment.extract().map_err(Report::new) // TODO: add figment context here
     }
 }

@@ -16,13 +16,11 @@ use crate::{
 
 #[tokio::main]
 async fn main() -> tokio::io::Result<()> {
-    env_logger::init();
-
     let config = config::EmitterSettings::load().unwrap_or_else(|err| {
         error!("Failed to load configuration: {}", err);
         std::process::exit(1);
     });
-    if std::env::var("RUST_LOG").is_err() {
+    if !log::log_enabled!(log::Level::Info) {
         println!("Resolved configuration, starting senders. Set RUST_LOG=debug to see logs.");
     }
     info!(config:serde; "Resolved configuration");
@@ -70,9 +68,9 @@ async fn main() -> tokio::io::Result<()> {
             MessageType::Syslog5424 => EventType::Syslog5424(
                 generators::Syslog5424EventGenerator::new(message_generator.clone()),
             ),
-            MessageType::NdJson => EventType::NdJson(
-                generators::NdJsonEventGenerator::new(message_generator.clone()),
-            ),
+            MessageType::NdJson => EventType::NdJson(generators::NdJsonEventGenerator::new(
+                message_generator.clone(),
+            )),
         };
         let config = emitter::EmitterConfig {
             rate: config.rate,
