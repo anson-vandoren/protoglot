@@ -26,3 +26,4 @@ figment = { version = "0.10.18", features = ["toml", "json", "test", "env"] }
 json5 = "0.4.1"
 directories = "5.0.1"
 eyre = "0.6.12"
+human_bytes = "0.4.3"

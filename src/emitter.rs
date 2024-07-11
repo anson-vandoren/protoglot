@@ -1,4 +1,7 @@
-use std::time::Duration;
+use std::time::{Duration, Instant};
+
+use human_bytes::human_bytes;
+use log::info;
 
 use crate::{generators::EventGenerator, transports::Transport};
 
@@ -14,14 +17,17 @@ pub struct Emitter<T: Transport, G: EventGenerator> {
     pub generator: G,
     pub config: EmitterConfig,
     cycles_sent: u64,
+    total_events: u64,
+    total_bytes: u64,
 }
 
 impl<T, G> Emitter<T, G>
 where
-    T: Transport + Send + 'static,
+    T: Transport + Send + 'static + std::fmt::Display,
     G: EventGenerator + Send + 'static,
 {
     pub async fn run(&mut self) -> tokio::io::Result<()> {
+        let start_time = Instant::now();
         // convert rate (in events per second) to interval (in microseconds)
         let mut interval = tokio::time::interval(Duration::from_micros(1000000 / self.config.rate));
 
@@ -30,6 +36,8 @@ where
                 interval.tick().await;
                 let event = self.generator.generate();
                 let serialized = event.serialize();
+                self.total_bytes += serialized.len() as u64;
+                self.total_events += 1;
                 self.transport.send(serialized).await?;
             }
             self.cycles_sent += 1;
@@ -38,6 +46,14 @@ where
                 tokio::time::sleep(Duration::from_millis(self.config.cycle_delay)).await;
             }
         }
+
+        let duration = start_time.elapsed();
+        let duration_secs = duration.as_secs_f64();
+        let events_per_sec = self.total_events as f64 / duration_secs;
+        info!(emitter=self.transport.to_string(); "{:.0} events/s average", events_per_sec);
+        let bytes_per_sec = self.total_bytes as f64 / duration_secs;
+        let formatted_bytes = human_bytes(bytes_per_sec);
+        info!(emitter=self.transport.to_string(); "{}/s average", formatted_bytes);
         Ok(())
     }
     pub fn new(transport: T, generator: G, config: EmitterConfig) -> Self {
@@ -46,6 +62,8 @@ where
             generator,
             config,
             cycles_sent: 0,
+            total_events: 0,
+            total_bytes: 0,
         }
     }
 }
