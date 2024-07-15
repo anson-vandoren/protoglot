@@ -1,15 +1,28 @@
 {
-  "host": "localhost", // FQDN or IP address
-  "port": 9514,
-  "tls": false, // defaults to false if omitted
-  "protocol": "tcp", // "tcp" or "udp"
-  "rate": 1000, // in events per second
-  // currently supported message types:
-  // - "syslog3164": RFC 3164 syslog message
-  // - "syslog5424": RFC 5424 syslog message
-  "messageType": "syslog3164",
-  "numEmitters": 1, // number of concurrent emitters to run, each at the EPS rate above
-  "eventsPerCycle": 10000, // number of events to send in each cycle
-  "numCycles": 1, // number of cycles to send, use 0 for infinite
-  "cycleDelay": 10000, // delay in milliseconds between cycles
+  emitter: {
+    host: 'localhost', // FQDN or IP address
+    port: 9514,
+    tls: false, // defaults to false if omitted
+    protocol: 'tcp', // "tcp" or "udp"
+    rate: 1000, // in events per second
+    // currently supported message types:
+    // - "syslog3164": RFC 3164 syslog message
+    // - "syslog5424": RFC 5424 syslog message
+    messageType: 'syslog3164',
+    numEmitters: 1, // number of concurrent emitters to run, each at the EPS rate above
+    eventsPerCycle: 10000, // number of events to send in each cycle
+    numCycles: 1, // number of cycles to send, use 0 for infinite
+    cycleDelay: 10000, // delay in milliseconds between cycles
+  },
+  absorber: {
+    updateInterval: 1000, // in milliseconds
+    messageType: 'syslog3164',
+    listenAddresses: [
+      {
+        host: '0.0.0.0',
+        port: 9514, // port to listen on
+        protocol: 'tcp', // "tcp" or "udp"
+      }
+    ]
+  }
 }

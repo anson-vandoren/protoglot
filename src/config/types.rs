@@ -1,5 +1,6 @@
 use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
+use eyre::Result;
 
 #[derive(Serialize, Deserialize, Debug, ValueEnum, Clone, PartialEq)]
 #[serde(rename_all = "lowercase")]
@@ -15,6 +16,16 @@ impl std::fmt::Display for Protocol {
             Protocol::Udp => "udp",
         };
         s.fmt(f)
+    }
+}
+
+impl Protocol {
+    pub fn from_str(input: &str) -> Result<Protocol, &'static str> {
+        match input.to_lowercase().as_str() {
+            "tcp" => Ok(Protocol::Tcp),
+            "udp" => Ok(Protocol::Udp),
+            _ => Err("Invalid protocol"),
+        }
     }
 }
 

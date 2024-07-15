@@ -1,5 +1,9 @@
 use std::fmt;
 
+use log::error;
+
+use crate::config::{EmitterConfig, Protocol};
+
 pub mod http;
 pub mod tcp;
 pub mod tcp_tls;
@@ -35,5 +39,36 @@ impl fmt::Display for TransportType {
             TransportType::TcpTls(transport) => write!(f, "{}", transport),
             TransportType::Udp(transport) => write!(f, "{}", transport),
         }
+    }
+}
+
+pub async fn create_transport(config: &EmitterConfig) -> tokio::io::Result<TransportType> {
+    match config.protocol {
+        Protocol::Tcp => {
+            if config.tls {
+                match tcp_tls::TcpTlsTransport::new(config.host.clone(), config.port).await {
+                    Ok(transport) => Ok(TransportType::TcpTls(transport)),
+                    Err(err) => {
+                        error!("Failed to create TcpTlsTransport: {}", err);
+                        Err(err)
+                    }
+                }
+            } else {
+                match tcp::TcpTransport::new(config.host.clone(), config.port).await {
+                    Ok(transport) => Ok(TransportType::Tcp(transport)),
+                    Err(err) => {
+                        error!("Failed to create TcpTransport: {}", err);
+                        Err(err)
+                    }
+                }
+            }
+        }
+        Protocol::Udp => match udp::UdpTransport::new(config.host.clone(), config.port).await {
+            Ok(transport) => Ok(TransportType::Udp(transport)),
+            Err(err) => {
+                error!("Failed to create UdpTransport: {}", err);
+                Err(err)
+            }
+        },
     }
 }

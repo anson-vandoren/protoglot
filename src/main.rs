@@ -1,3 +1,4 @@
+mod absorber;
 mod config;
 mod emitter;
 mod generators;
@@ -5,18 +6,16 @@ mod transports;
 
 use std::sync::Arc;
 
-use emitter::Emitter;
+use emitter::{Emitter, EmitterConfig};
+use generators::create_generator;
 use log::{error, info};
+use transports::create_transport;
 
-use crate::{
-    config::{MessageType, Protocol},
-    generators::EventType,
-    transports::TransportType,
-};
+use crate::{absorber::Absorber, config::AppSettings};
 
 #[tokio::main]
 async fn main() -> tokio::io::Result<()> {
-    let config = config::EmitterSettings::load().unwrap_or_else(|err| {
+    let config = AppSettings::load().unwrap_or_else(|err| {
         error!("Failed to load configuration: {}", err);
         std::process::exit(1);
     });
@@ -24,70 +23,41 @@ async fn main() -> tokio::io::Result<()> {
         println!("Resolved configuration, starting senders. Set RUST_LOG=debug to see logs.");
     }
     info!(config:serde; "Resolved configuration");
-    let message_generator = Arc::new(generators::RandomStringGenerator::new());
 
-    // spawn each emitter as a separate task and collect their handles
     let mut handles = Vec::new();
-    let num_emitters = config.num_emitters;
-    for _ in 0..num_emitters {
-        let transport = match config.protocol {
-            Protocol::Tcp => match config.tls {
-                true => TransportType::TcpTls(
-                    match transports::tcp_tls::TcpTlsTransport::new(
-                        config.host.clone(),
-                        config.port,
-                    )
-                    .await
-                    {
-                        Ok(transport) => transport,
-                        Err(_err) => {
-                            // error already logged in TcpTlsTransport
-                            continue;
-                        }
-                    },
-                ),
-                false => TransportType::Tcp(
-                    match transports::tcp::TcpTransport::new(config.host.clone(), config.port).await
-                    {
-                        Ok(transport) => transport,
-                        Err(_err) => {
-                            // error already logged in TcpTransport
-                            continue;
-                        }
-                    },
-                ),
-            },
-            Protocol::Udp => TransportType::Udp(
-                transports::udp::UdpTransport::new(config.host.clone(), config.port).await?,
-            ),
-        };
-        let generator = match config.message_type {
-            MessageType::Syslog3164 => EventType::Syslog3164(
-                generators::Syslog3164EventGenerator::new(message_generator.clone()),
-            ),
-            MessageType::Syslog5424 => EventType::Syslog5424(
-                generators::Syslog5424EventGenerator::new(message_generator.clone()),
-            ),
-            MessageType::NdJson => EventType::NdJson(generators::NdJsonEventGenerator::new(
-                message_generator.clone(),
-            )),
-        };
-        let config = emitter::EmitterConfig {
-            rate: config.rate,
-            num_cycles: config.num_cycles,
-            events_per_cycle: config.events_per_cycle,
-            cycle_delay: config.cycle_delay,
-        };
-        let mut emitter = Emitter::new(transport, generator, config);
 
-        handles.push(tokio::spawn(async move {
-            match emitter.run().await {
-                Ok(_) => {
-                    info!(emitter = emitter.transport.to_string(); "Emitter completed successfully")
+    if let Some(emitter_config) = &config.emitter {
+        let message_generator = Arc::new(generators::RandomStringGenerator::new());
+        for _ in 0..emitter_config.num_emitters {
+            let transport = create_transport(&emitter_config).await?;
+            let generator =
+                create_generator(&emitter_config.message_type, message_generator.clone());
+            let emitter_config = EmitterConfig {
+                rate: emitter_config.rate,
+                num_cycles: emitter_config.num_cycles,
+                events_per_cycle: emitter_config.events_per_cycle,
+                cycle_delay: emitter_config.cycle_delay,
+            };
+            let mut emitter = Emitter::new(transport, generator, emitter_config);
+
+            handles.push(tokio::spawn(async move {
+                match emitter.run().await {
+                    Ok(_) => {
+                        info!(emitter = emitter.transport.to_string(); "Emitter completed successfully")
+                    }
+                    Err(err) => error!("Emitter failed: {}", err),
                 }
-                Err(err) => error!("Emitter failed: {}", err),
+            }))
+        }
+    }
+
+    if let Some(absorber_config) = &config.absorber {
+        let absorber = Absorber::new(absorber_config.clone());
+        handles.push(tokio::spawn(async move {
+            if let Err(e) = absorber.run().await {
+                error!("Absorber failed: {}", e);
             }
-        }));
+        }))
     }
 
     // wait for all emitters to complete
