@@ -29,14 +29,6 @@ When running protoglot in a Docker container, the configuration options and comm
 $ docker run --rm ansonvandoren/protoglot --host 172.17.0.1 # or host.docker.internal for macfolk
 ```
 
-or
-
-```bash
-$ docker run --rm -e GLOT_host=172.17.0.1 ansonvandoren/protoglot # or host.docker.internal for macfolk
-```
-
-__Note__: Environment variable naming is kind of borked right now and need some work. Currently, the `GLOT_` prefix should be uppercase but the field name should be lowercase. This will be fixed in a future release.
-
 ## Running
 
 1. Run `protoglot --help` to see the available options.
@@ -44,20 +36,28 @@ __Note__: Environment variable naming is kind of borked right now and need some 
 
 ```json5
 {
-  "host": "localhost", // FQDN or IP address
-  "port": 9514,
-  "tls": false, // defaults to false if omitted
-  "protocol": "tcp", // "tcp" or "udp"
-  "rate": 1000, // in events per second
-  // currently supported message types:
-  // - "syslog3164": RFC 3164 syslog message
-  // - "syslog5424": RFC 5424 syslog message
-  "messageType": "syslog3164",
-  "numEmitters": 1, // number of concurrent emitters to run, each at the EPS rate above
-  "eventsPerCycle": 10000, // number of events to send in each cycle
-  "numCycles": 1, // number of cycles to send, use 0 for infinite
-  "cycleDelay": 10000, // delay in milliseconds between cycles
+  emitter: {
+    host: "localhost", // FQDN or IP address
+    port: 9514,
+    tls: false, // defaults to false if omitted
+    protocol: "tcp", // "tcp" or "udp"
+    rate: 1000, // in events per second
+    // currently supported message types:
+    // - "syslog3164": RFC 3164 syslog message
+    // - "syslog5424": RFC 5424 syslog message
+    messageType: "syslog3164",
+    numEmitters: 1, // number of concurrent emitters to run, each at the EPS rate above
+    eventsPerCycle: 10000, // number of events to send in each cycle
+    numCycles: 1, // number of cycles to send, use 0 for infinite
+    cycleDelay: 10000, // delay in milliseconds between cycles
+  },
+  absorber: {
+    updateInterval: 5000, // in milliseconds
+    messageType: "syslog3164",
+    listenAddresses: [], // absorber does not listen by default
+  }
 }
+
 ```
 
 3. If you have a JSON5 config file located in your system's config directories, that will be used in place of the default.
@@ -67,8 +67,7 @@ __Note__: Environment variable naming is kind of borked right now and need some 
 
 4. If you pass a `--file` argument, protoglot will read the config from that file instead of the default or system config file.
 5. Only one of the above config files will be used (in the order described), and whichever file is selected must be contain all fields present in the default config file.
-6. You can override specific fields from the config using environment variables prefixed by `GLOP_` and the field name in all caps. For example, to override the `host` field, you would set the `GLOT_HOST` environment variable.
-7. If you wish to override specific fields from the command line, you can do so with the appropriate flags as described in the help output. Command line arguments will override both config files and environment variables.
+6. If you wish to override specific fields from the command line, you can do so with the appropriate flags as described in the help output. Command line arguments will override both config files and environment variables.
 
 
 # Components:
@@ -94,4 +93,6 @@ __Note__: Environment variable naming is kind of borked right now and need some 
 
 ## Absorbers
 
-TODO: Not yet implemented
+- Absorbers are composed of:
+  - A listening address, port, and protocol
+  - A message checker (to verify correctness to some degree)

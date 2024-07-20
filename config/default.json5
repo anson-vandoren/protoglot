@@ -17,6 +17,6 @@
   absorber: {
     updateInterval: 5000, // in milliseconds
     messageType: 'syslog3164',
-    listenAddresses: []
+    listenAddresses: [], // absorber does not listen by default
   }
 }
