@@ -1,6 +1,6 @@
 use clap::ValueEnum;
-use serde::{Deserialize, Serialize};
 use eyre::Result;
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, ValueEnum, Clone, PartialEq)]
 #[serde(rename_all = "lowercase")]
@@ -29,7 +29,7 @@ impl Protocol {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, ValueEnum, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, ValueEnum, Clone, PartialEq, Copy)]
 #[serde(rename_all = "lowercase")]
 pub(crate) enum MessageType {
     Syslog3164,

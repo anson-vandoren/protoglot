@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use super::{MessageType, Protocol};
 
-#[derive(Parser, Serialize, Deserialize, Debug)]
+#[derive(Parser, Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 #[command(version, about)]
 pub(super) struct CliArgs {
@@ -70,7 +70,8 @@ pub(super) struct CliArgs {
     pub(super) command: Option<Commands>,
 }
 
-#[derive(Subcommand, Serialize, Deserialize, Debug)]
+#[derive(Subcommand, Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub(super) enum Commands {
     /// Start an absorber instead
     Absorber {

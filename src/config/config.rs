@@ -4,10 +4,7 @@ use std::str::FromStr;
 use clap::Parser;
 use directories::ProjectDirs;
 use eyre::{Report, Result};
-use figment::providers::{Env, Format, Serialized};
-use figment::Figment;
 use log::{debug, info, trace};
-use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
 use super::cli::{CliArgs, Commands};
@@ -42,13 +39,17 @@ pub struct EmitterConfig {
     pub cycle_delay: u64,
 }
 
+#[derive(Serialize, Clone, Deserialize, Debug)]
+struct FullConfig {
+    emitter: Option<EmitterConfig>,
+    absorber: Option<AbsorberConfig>,
+}
+
 impl EmitterConfig {
     fn default() -> Result<Self> {
         let config_str = include_str!("../../config/default.json5");
-        let figment = Figment::from(Json5::string(config_str).nested());
-        let res = figment.select("emitter").extract().map_err(Report::new);
-        info!(res:?; "Default emitter config");
-        res
+        let full_config: FullConfig = serde_json5::from_str(config_str).map_err(Report::new)?;
+        Ok(full_config.emitter.unwrap())
     }
 }
 
@@ -60,13 +61,11 @@ pub struct AbsorberConfig {
     pub message_type: MessageType,
 }
 
-impl Default for AbsorberConfig {
-    fn default() -> Self {
-        Self {
-            listen_addresses: vec![ListenAddress::default()],
-            update_interval: 60,
-            message_type: MessageType::NdJson,
-        }
+impl AbsorberConfig {
+    fn default() -> Result<Self> {
+        let config_str = include_str!("../../config/default.json5");
+        let full_config: FullConfig = serde_json5::from_str(config_str).map_err(Report::new)?;
+        Ok(full_config.absorber.unwrap())
     }
 }
 
@@ -110,17 +109,6 @@ impl ListenAddress {
     }
 }
 
-struct Json5;
-impl figment::providers::Format for Json5 {
-    type Error = json5::Error;
-
-    const NAME: &'static str = "JSON5";
-
-    fn from_str<'de, T: DeserializeOwned>(s: &'de str) -> Result<T, Self::Error> {
-        json5::from_str(s)
-    }
-}
-
 impl AppSettings {
     pub fn load() -> Result<Self> {
         let args = CliArgs::parse();
@@ -138,8 +126,16 @@ impl AppSettings {
         };
 
         Ok(AppSettings {
-            emitter: if matches!(mode, AppMode::Emitter) { Some(config.emitter.unwrap()) } else { None },
-            absorber: if matches!(mode, AppMode::Absorber) { Some(config.absorber.unwrap()) } else { None },
+            emitter: if matches!(mode, AppMode::Emitter) {
+                Some(config.emitter.unwrap())
+            } else {
+                None
+            },
+            absorber: if matches!(mode, AppMode::Absorber) {
+                Some(config.absorber.unwrap())
+            } else {
+                None
+            },
             mode,
         })
     }
@@ -157,10 +153,11 @@ impl AppSettings {
             .init();
     }
 
-    fn load_config_file(file_path: &Path) -> Result<figment::providers::Data<Json5>, Report> {
+    fn load_config_file(file_path: &Path) -> Result<FullConfig> {
         if file_path.exists() {
             info!(file = file_path.to_str(); "Using specified file");
-            Ok(Json5::file(file_path))
+            serde_json5::from_str(&std::fs::read_to_string(file_path).map_err(Report::new)?)
+                .map_err(Report::new)
         } else {
             Err(Report::new(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
@@ -170,55 +167,125 @@ impl AppSettings {
     }
 
     fn load_emitter_config(args: CliArgs) -> Result<Self> {
-        // The settings are loaded in the following order:
-        // 1. load defaults from file which will be baked into the binary
-        let mut figment = Figment::from(Serialized::defaults(EmitterConfig::default()?));
-        figment = figment.select("emitter");
+        // start with the baked-in defaults
+        let mut config = EmitterConfig::default()?;
 
-        // 2. load values from config directory, overlaying on defaults
+        // overwrite with config file from standard location, if present
         if let Some(proj_dirs) = ProjectDirs::from("com", "ansonvandoren", "protoglot") {
             let config_file_path = proj_dirs.config_dir().join("config.json5");
             if config_file_path.exists() {
-                let mut file_figment = Figment::from(Json5::file(&config_file_path).nested());
-                file_figment = file_figment.select("emitter");
-                figment = figment.merge(file_figment);
-                info!("Using config file found at {:?}", config_file_path);
-            } else {
-                info!(
-                    "No config file found at {:?}, using defaults",
-                    config_file_path
-                );
+                let file_config: FullConfig = Self::load_config_file(&config_file_path)?;
+                if let Some(emitter) = file_config.emitter {
+                    config = emitter;
+                }
             }
-        } else {
-            info!("No config directory found, using defaults");
         }
 
-        debug!(args:serde; "Parsed CLI args");
-
-        // 3. if a file arg is provided, overlay that on defaults+configDir
+        // overwrite with passed-in file, if exists
         if let Some(ref file_path) = args.file {
-            figment = figment.merge(Self::load_config_file(&file_path)?);
+            let file_config: FullConfig = Self::load_config_file(&file_path)?;
+            if let Some(emitter) = file_config.emitter {
+                config = emitter;
+            }
         }
 
-        // 4. if env vars are provided, overlay those on defaults+configDir+file
-        figment = figment.merge(Env::prefixed("GLOT_").lowercase(false).split("__"));
+        // overwrite with cli args that are present
+        if let Some(host) = args.host {
+            config.host = host;
+        }
+        if let Some(port) = args.port {
+            config.port = port;
+        }
+        if let Some(rate) = args.rate {
+            config.rate = rate;
+        }
+        if let Some(tls) = args.tls {
+            config.tls = tls;
+        }
+        if let Some(protocol) = args.protocol {
+            config.protocol = protocol;
+        }
+        if let Some(message_type) = args.message_type {
+            config.message_type = message_type;
+        }
+        if let Some(num_emitters) = args.num_emitters {
+            config.num_emitters = num_emitters;
+        }
+        if let Some(events_per_cycle) = args.events_per_cycle {
+            config.events_per_cycle = events_per_cycle;
+        }
+        if let Some(num_cycles) = args.num_cycles {
+            config.num_cycles = num_cycles;
+        }
+        if let Some(cycle_delay) = args.cycle_delay {
+            config.cycle_delay = cycle_delay;
+        }
 
-        // 5. if CLI args are provided, overlay those on defaults+configDir+file+env
-        figment = figment.merge(Serialized::defaults(args));
-
-        trace!(figment:?; "Final configuration");
-        let emitter_config = figment.extract().map_err(Report::new);
         Ok(AppSettings {
             mode: AppMode::Emitter,
-            emitter: Some(emitter_config?),
+            emitter: Some(config),
             absorber: None,
         })
     }
 
     fn load_absorber_config(args: CliArgs) -> Result<Self> {
-        let mut figment = Figment::from(Serialized::defaults(AbsorberConfig::default()));
-        let absorber_args = args.command.unwrap(); // TODO: how to do this correctly?
-        figment = figment.merge(Serialized::defaults(absorber_args));
-        figment.extract().map_err(Report::new)
+        // start with the baked-in defaults
+        let mut config = AbsorberConfig::default()?;
+
+        // overwrite with config file from standard location, if present
+        if let Some(proj_dirs) = ProjectDirs::from("com", "ansonvandoren", "protoglot") {
+            let config_file_path = proj_dirs.config_dir().join("config.json5");
+            if config_file_path.exists() {
+                debug!("Checking for config file at {:?}", config_file_path);
+                let file_config: FullConfig = Self::load_config_file(&config_file_path)?;
+                if let Some(absorber) = file_config.absorber {
+                    debug!("Overwriting config with file");
+                    config = absorber;
+                } else {
+                    debug!("No absorber config in file");
+                }
+            }
+        }
+
+        // overwrite with passed-in file, if exists
+        if let Some(ref file_path) = args.file {
+            debug!("Checking for config file at {:?}", file_path);
+            let file_config: FullConfig = Self::load_config_file(&file_path)?;
+            if let Some(absorber) = file_config.absorber {
+                debug!("Overwriting config with file");
+                config = absorber;
+            }
+        }
+
+        // overwrite with cli args that are present
+        if let Some(Commands::Absorber {
+            update_interval,
+            listen_addresses,
+            message_type,
+        }) = &args.command
+        {
+            debug!("Overwriting config with CLI args");
+            if let Some(interval) = update_interval {
+                debug!("Setting update interval to {}", interval);
+                config.update_interval = *interval;
+            }
+            if let Some(addrs) = listen_addresses {
+                config.listen_addresses = addrs
+                    .iter()
+                    .map(|addr| ListenAddress::from_str(addr).unwrap())
+                    .collect();
+                debug!("Setting listen addresses to {:?}", config.listen_addresses);
+            }
+            if let Some(msg_type) = message_type {
+                config.message_type = *msg_type;
+            }
+        }
+
+        Ok(AppSettings {
+            mode: AppMode::Absorber,
+            emitter: None,
+            absorber: Some(config),
+        })
+
     }
 }

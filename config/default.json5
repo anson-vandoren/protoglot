@@ -15,14 +15,8 @@
     cycleDelay: 10000, // delay in milliseconds between cycles
   },
   absorber: {
-    updateInterval: 1000, // in milliseconds
+    updateInterval: 5000, // in milliseconds
     messageType: 'syslog3164',
-    listenAddresses: [
-      {
-        host: '0.0.0.0',
-        port: 9514, // port to listen on
-        protocol: 'tcp', // "tcp" or "udp"
-      }
-    ]
+    listenAddresses: []
   }
 }
