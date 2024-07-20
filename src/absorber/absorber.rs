@@ -1,4 +1,6 @@
 use crate::config::{AbsorberConfig, ListenAddress, MessageType, Protocol};
+use human_bytes::human_bytes;
+use log::{debug, trace};
 use std::sync::Arc;
 use tokio::{io::AsyncReadExt, sync::Mutex};
 
@@ -9,6 +11,8 @@ pub struct Absorber {
 
 struct AbsorberStats {
     total_events: u64,
+    intv_events: u64,
+    intv_bytes: u64,
     total_bytes: u64,
     start_time: std::time::Instant,
 }
@@ -20,6 +24,8 @@ impl Absorber {
             stats: Arc::new(Mutex::new(AbsorberStats {
                 total_events: 0,
                 total_bytes: 0,
+                intv_events: 0,
+                intv_bytes: 0,
                 start_time: std::time::Instant::now(),
             })),
         }
@@ -79,6 +85,7 @@ impl Absorber {
             let stats = Arc::clone(&stats);
             let absorber = Arc::clone(&absorber);
             tokio::spawn(async move {
+                debug!("Accepted TCP connection from: {}", socket.peer_addr().unwrap());
                 if let Err(e) = absorber.handle_tcp_connection(socket, stats).await {
                     eprintln!("Error handling TCP connection: {}", e);
                 }
@@ -112,6 +119,9 @@ impl Absorber {
                 Ok(0) => break, // connection closed
                 Ok(_) => {
                     if let Some(message) = self.extract_message(&mut buf) {
+                        // convert message to string for logging
+                        let message_str = String::from_utf8_lossy(&message);
+                        trace!("Received message: {:?}", message_str);
                         self.process_message(&message, stats.clone()).await;
                     }
                 }
@@ -140,7 +150,10 @@ impl Absorber {
         if self.validate_message(message) {
             let mut stats = stats.lock().await;
             stats.total_events += 1;
-            stats.total_bytes += message.len() as u64;
+            stats.intv_events += 1;
+            let message_len = message.len() as u64;
+            stats.total_bytes += message_len;
+            stats.intv_bytes += message_len;
         }
     }
 
@@ -173,14 +186,34 @@ impl Absorber {
     ) -> Result<(), tokio::io::Error> {
         loop {
             tokio::time::sleep(tokio::time::Duration::from_millis(update_interval)).await;
-            let stats = stats.lock().await;
+            let mut stats = stats.lock().await;
             let elapsed = stats.start_time.elapsed().as_secs_f64();
-            let events_per_sec = stats.total_events as f64 / elapsed;
-            let bytes_per_sec = stats.total_bytes as f64 / elapsed;
-            println!(
-                "Events: {}, Bytes: {}, EPS: {:.2}, BPS: {:.2}",
-                stats.total_events, stats.total_bytes, events_per_sec, bytes_per_sec
-            );
+            if stats.intv_events > 0 {
+                let events_per_sec = stats.intv_events as f64 / elapsed;
+                let fmt_eps = Self::human_events(events_per_sec);
+                let bytes_per_sec = stats.intv_bytes as f64 / elapsed;
+                let fmt_bps = human_bytes(bytes_per_sec);
+                println!(
+                    "Total events: {}, {} EPS average, {}/s average",
+                    stats.total_events, fmt_eps, fmt_bps
+                );
+            }
+            // reset interval start time
+            stats.start_time = std::time::Instant::now();
+            stats.intv_bytes = 0;
+            stats.intv_events = 0;
+        }
+    }
+
+    fn human_events(events: f64) -> String {
+        if events < 1_000.0 {
+            events.to_string()
+        } else if events < 1_000_000.0 {
+            format!("{:.1}k", events / 1_000.0)
+        } else if events < 1_000_000_000.0 {
+            format!("{:.1}M", events / 1_000_000.0)
+        } else {
+            format!("{:.1}B", events / 1_000_000_000.0)
         }
     }
 
@@ -194,6 +227,8 @@ impl Absorber {
                         *stats = AbsorberStats {
                             total_events: 0,
                             total_bytes: 0,
+                            intv_events: 0,
+                            intv_bytes: 0,
                             start_time: std::time::Instant::now(),
                         };
                         println!("Stats reset")
