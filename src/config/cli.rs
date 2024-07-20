@@ -1,15 +1,16 @@
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 use super::{MessageType, Protocol};
 
-#[derive(Parser, Serialize, Deserialize, Debug)]
+#[derive(Parser, Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 #[command(version, about)]
 pub(super) struct CliArgs {
     /// Path to the configuration file
     #[arg(short, long)]
-    pub(super) file: Option<std::path::PathBuf>,
+    pub(super) file: Option<PathBuf>,
 
     /// Target host
     #[arg(short = 'H', long)]
@@ -61,7 +62,32 @@ pub(super) struct CliArgs {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(super) cycle_delay: Option<u64>,
 
-    /// control output verbosity
+    /// Control output verbosity
     #[arg(short, action = clap::ArgAction::Count)]
     pub(super) verbose: u8,
+
+    #[command(subcommand)]
+    pub(super) command: Option<Commands>,
+}
+
+#[derive(Subcommand, Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub(super) enum Commands {
+    /// Start an absorber instead
+    Absorber {
+        /// Update interval for absorber stats in milliseconds
+        #[arg(long = "update-interval")]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        update_interval: Option<u64>,
+
+        /// Listen addresses for absorber (format: host:port:protocol, can be specified multiple times)
+        #[arg(long = "listen")]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        listen_addresses: Option<Vec<String>>,
+
+        /// Message type
+        #[arg(long)]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        message_type: Option<MessageType>,
+    },
 }

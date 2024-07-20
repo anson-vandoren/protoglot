@@ -1,4 +1,5 @@
 use clap::ValueEnum;
+use eyre::Result;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, ValueEnum, Clone, PartialEq)]
@@ -18,7 +19,17 @@ impl std::fmt::Display for Protocol {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, ValueEnum, Clone, PartialEq)]
+impl Protocol {
+    pub fn from_str(input: &str) -> Result<Protocol, &'static str> {
+        match input.to_lowercase().as_str() {
+            "tcp" => Ok(Protocol::Tcp),
+            "udp" => Ok(Protocol::Udp),
+            _ => Err("Invalid protocol"),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, ValueEnum, Clone, PartialEq, Copy)]
 #[serde(rename_all = "lowercase")]
 pub(crate) enum MessageType {
     Syslog3164,
