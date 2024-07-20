@@ -97,4 +97,34 @@ mod tests {
             "<14>1 2024-07-08T09:10:11.000Z localhost test 1234 - - Hello, world!\n"
         );
     }
+
+    use proptest::prelude::*;
+    proptest! {
+        #[test]
+        fn test_syslog5424_serialization(
+            facility in 0u8..24u8,
+            severity in 0u8..8u8,
+            message in "\\PC*",
+            hostname in "[a-zA-Z0-9\\.-]{1,255}",
+            app_name in "[a-zA-Z0-9\\.-]{1,48}",
+        ) {
+            let event = Syslog5424 {
+                timestamp: chrono::Utc::now(),
+                message: message.clone(),
+                facility,
+                severity,
+                app_name: app_name.clone(),
+                pid: 1234,
+                hostname: hostname.clone(),
+            };
+
+            let serialized = event.serialize();
+            let serialized_str = String::from_utf8(serialized).expect("invalid utf-8");
+            assert!(serialized_str.starts_with(&format!("<{}>1 ", facility * 8 + severity)),
+                "Serialized syslog should start with correct PRI value");
+            assert!(serialized_str.contains(&hostname), "Serialized syslog should contain hostname");
+            assert!(serialized_str.contains(&app_name), "Serialized syslog should contain app_name");
+            assert!(serialized_str.contains(&message), "Serialized syslog should contain message");
+        }
+    }
 }

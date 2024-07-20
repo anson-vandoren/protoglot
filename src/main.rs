@@ -20,7 +20,7 @@ async fn main() -> tokio::io::Result<()> {
         std::process::exit(1);
     });
     if !log::log_enabled!(log::Level::Info) {
-        println!("Resolved configuration, starting senders. Set RUST_LOG=debug to see logs.");
+        println!("Resolved configuration, starting... Use -v[vv] to see more logs");
     }
     info!(config:serde; "Resolved configuration");
 

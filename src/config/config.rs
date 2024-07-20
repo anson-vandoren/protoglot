@@ -286,6 +286,5 @@ impl AppSettings {
             emitter: None,
             absorber: Some(config),
         })
-
     }
 }

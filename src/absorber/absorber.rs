@@ -85,7 +85,10 @@ impl Absorber {
             let stats = Arc::clone(&stats);
             let absorber = Arc::clone(&absorber);
             tokio::spawn(async move {
-                debug!("Accepted TCP connection from: {}", socket.peer_addr().unwrap());
+                debug!(
+                    "Accepted TCP connection from: {}",
+                    socket.peer_addr().unwrap()
+                );
                 if let Err(e) = absorber.handle_tcp_connection(socket, stats).await {
                     eprintln!("Error handling TCP connection: {}", e);
                 }
