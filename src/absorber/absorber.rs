@@ -1,8 +1,10 @@
-use crate::config::{AbsorberConfig, ListenAddress, MessageType, Protocol};
+use std::sync::Arc;
+
 use human_bytes::human_bytes;
 use log::{debug, trace};
-use std::sync::Arc;
 use tokio::{io::AsyncReadExt, sync::Mutex};
+
+use crate::config::{absorber::AbsorberConfig, ListenAddress, MessageType, Protocol};
 
 pub struct Absorber {
     config: Arc<AbsorberConfig>,
@@ -37,18 +39,12 @@ impl Absorber {
         for address in &self.config.listen_addresses {
             let absorber = self.clone();
             let address = address.clone();
-            let handle =
-                tokio::spawn(
-                    async move { absorber.listen(address, Arc::clone(&absorber.stats)).await },
-                );
+            let handle = tokio::spawn(async move { absorber.listen(address, Arc::clone(&absorber.stats)).await });
             handles.push(handle);
         }
 
         let update_interval = self.config.update_interval;
-        let stats_handle = tokio::spawn(Absorber::update_stats(
-            Arc::clone(&self.stats),
-            update_interval,
-        ));
+        let stats_handle = tokio::spawn(Absorber::update_stats(Arc::clone(&self.stats), update_interval));
         handles.push(stats_handle);
 
         let input_handle = tokio::spawn(Absorber::handle_user_input(Arc::clone(&self.stats)));
@@ -61,34 +57,22 @@ impl Absorber {
         Ok(())
     }
 
-    async fn listen(
-        &self,
-        address: ListenAddress,
-        stats: Arc<Mutex<AbsorberStats>>,
-    ) -> tokio::io::Result<()> {
+    async fn listen(&self, address: ListenAddress, stats: Arc<Mutex<AbsorberStats>>) -> tokio::io::Result<()> {
         match address.protocol {
             Protocol::Tcp => self.listen_tcp(address, stats).await,
             Protocol::Udp => self.listen_udp(address, stats).await,
         }
     }
 
-    async fn listen_tcp(
-        &self,
-        address: ListenAddress,
-        stats: Arc<Mutex<AbsorberStats>>,
-    ) -> tokio::io::Result<()> {
-        let listener =
-            tokio::net::TcpListener::bind(format!("{}:{}", address.host, address.port)).await?;
+    async fn listen_tcp(&self, address: ListenAddress, stats: Arc<Mutex<AbsorberStats>>) -> tokio::io::Result<()> {
+        let listener = tokio::net::TcpListener::bind(format!("{}:{}", address.host, address.port)).await?;
         let absorber = Arc::new(self.clone());
         loop {
             let (socket, _) = listener.accept().await?;
             let stats = Arc::clone(&stats);
             let absorber = Arc::clone(&absorber);
             tokio::spawn(async move {
-                debug!(
-                    "Accepted TCP connection from: {}",
-                    socket.peer_addr().unwrap()
-                );
+                debug!("Accepted TCP connection from: {}", socket.peer_addr().unwrap());
                 if let Err(e) = absorber.handle_tcp_connection(socket, stats).await {
                     eprintln!("Error handling TCP connection: {}", e);
                 }
@@ -96,13 +80,8 @@ impl Absorber {
         }
     }
 
-    async fn listen_udp(
-        &self,
-        address: ListenAddress,
-        stats: Arc<Mutex<AbsorberStats>>,
-    ) -> tokio::io::Result<()> {
-        let socket =
-            tokio::net::UdpSocket::bind(format!("{}:{}", address.host, address.port)).await?;
+    async fn listen_udp(&self, address: ListenAddress, stats: Arc<Mutex<AbsorberStats>>) -> tokio::io::Result<()> {
+        let socket = tokio::net::UdpSocket::bind(format!("{}:{}", address.host, address.port)).await?;
         let mut buf = [0; 65535];
         loop {
             let (len, _) = socket.recv_from(&mut buf).await?;
@@ -111,11 +90,7 @@ impl Absorber {
         }
     }
 
-    async fn handle_tcp_connection(
-        &self,
-        mut socket: tokio::net::TcpStream,
-        stats: Arc<Mutex<AbsorberStats>>,
-    ) -> tokio::io::Result<()> {
+    async fn handle_tcp_connection(&self, mut socket: tokio::net::TcpStream, stats: Arc<Mutex<AbsorberStats>>) -> tokio::io::Result<()> {
         let mut buf = Vec::new();
         loop {
             match socket.read_buf(&mut buf).await {
@@ -183,10 +158,7 @@ impl Absorber {
         serde_json::from_slice::<serde_json::Value>(message).is_ok()
     }
 
-    async fn update_stats(
-        stats: Arc<Mutex<AbsorberStats>>,
-        update_interval: u64,
-    ) -> Result<(), tokio::io::Error> {
+    async fn update_stats(stats: Arc<Mutex<AbsorberStats>>, update_interval: u64) -> Result<(), tokio::io::Error> {
         loop {
             tokio::time::sleep(tokio::time::Duration::from_millis(update_interval)).await;
             let mut stats = stats.lock().await;

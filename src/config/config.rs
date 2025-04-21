@@ -1,14 +1,18 @@
-use std::path::Path;
-use std::str::FromStr;
+use std::{
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
-use clap::Parser;
 use directories::ProjectDirs;
-use eyre::{Report, Result};
 use log::{debug, info, trace};
 use serde::{Deserialize, Serialize};
 
-use super::cli::{CliArgs, Commands};
-use super::{MessageType, Protocol};
+use super::{
+    absorber::{AbsorberConfig, PartialAbsorberConfig},
+    cli::{CliArgs, Commands},
+    emitter::{EmitterConfig, PartialEmitterConfig},
+    Protocol,
+};
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -22,54 +26,18 @@ pub struct AppSettings {
 pub enum AppMode {
     Emitter,
     Absorber,
+    Config,
 }
 
 #[derive(Serialize, Clone, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct EmitterConfig {
-    pub host: String,
-    pub port: u16,
-    pub rate: u64,
-    pub tls: bool,
-    pub protocol: Protocol,
-    pub message_type: MessageType,
-    pub num_emitters: u64,
-    pub events_per_cycle: u64,
-    pub num_cycles: u64,
-    pub cycle_delay: u64,
+pub struct FullConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub emitter: Option<PartialEmitterConfig>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub absorber: Option<PartialAbsorberConfig>,
 }
 
-#[derive(Serialize, Clone, Deserialize, Debug)]
-struct FullConfig {
-    emitter: Option<EmitterConfig>,
-    absorber: Option<AbsorberConfig>,
-}
-
-impl EmitterConfig {
-    fn default() -> Result<Self> {
-        let config_str = include_str!("../../config/default.json5");
-        let full_config: FullConfig = serde_json5::from_str(config_str).map_err(Report::new)?;
-        Ok(full_config.emitter.unwrap())
-    }
-}
-
-#[derive(Serialize, Clone, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct AbsorberConfig {
-    pub listen_addresses: Vec<ListenAddress>,
-    pub update_interval: u64,
-    pub message_type: MessageType,
-}
-
-impl AbsorberConfig {
-    fn default() -> Result<Self> {
-        let config_str = include_str!("../../config/default.json5");
-        let full_config: FullConfig = serde_json5::from_str(config_str).map_err(Report::new)?;
-        Ok(full_config.absorber.unwrap())
-    }
-}
-
-#[derive(Serialize, Clone, Deserialize, Debug)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ListenAddress {
     pub host: String,
@@ -87,56 +55,55 @@ impl Default for ListenAddress {
     }
 }
 
-impl ListenAddress {
-    pub fn from_str(s: &str) -> Result<Self> {
+impl TryFrom<&str> for ListenAddress {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
         // ex: "tcp://127.0.0.1:4242"
-        let parts: Vec<&str> = s.split("://").collect();
+        let parts: Vec<&str> = value.split("://").collect();
         if parts.len() != 2 {
-            return Err(Report::msg("Invalid listen address format"));
+            return Err(anyhow::anyhow!("Invalid listen address format"));
         }
-        let protocol = Protocol::from_str(parts[0]).map_err(|e| Report::msg(e))?;
+        let protocol = Protocol::try_from(parts[0])?;
         let parts: Vec<&str> = parts[1].split(':').collect();
         if parts.len() != 2 {
-            return Err(Report::msg("Invalid listen address format"));
+            return Err(anyhow::anyhow!("Invalid listen address format"));
         }
         let host = parts[0].to_string();
-        let port = parts[1].parse().map_err(Report::new)?;
-        Ok(Self {
-            host,
-            port,
-            protocol,
-        })
+        let port = parts[1].parse()?;
+        Ok(Self { host, port, protocol })
     }
 }
 
 impl AppSettings {
-    pub fn load() -> Result<Self> {
-        let args = CliArgs::parse();
+    pub fn load(args: CliArgs) -> anyhow::Result<Self> {
         Self::setup_logging(args.verbose);
 
-        let (mode, config) = match &args.command {
+        Ok(match &args.command {
             Some(Commands::Absorber { .. }) => {
                 trace!("Starting absorber");
-                (AppMode::Absorber, Self::load_absorber_config(args)?)
+                Self {
+                    emitter: None,
+                    absorber: Self::load_absorber_config(args)?.absorber,
+                    mode: AppMode::Absorber,
+                }
+            }
+            Some(Commands::Config { overwrite }) => {
+                write_default_config(overwrite.unwrap_or(false))?;
+                Self {
+                    emitter: None,
+                    absorber: None,
+                    mode: AppMode::Config,
+                }
             }
             None => {
                 info!("No command specified, starting emitter");
-                (AppMode::Emitter, Self::load_emitter_config(args)?)
+                Self {
+                    absorber: None,
+                    emitter: Self::load_emitter_config(args)?.emitter,
+                    mode: AppMode::Emitter,
+                }
             }
-        };
-
-        Ok(AppSettings {
-            emitter: if matches!(mode, AppMode::Emitter) {
-                Some(config.emitter.unwrap())
-            } else {
-                None
-            },
-            absorber: if matches!(mode, AppMode::Absorber) {
-                Some(config.absorber.unwrap())
-            } else {
-                None
-            },
-            mode,
         })
     }
 
@@ -153,73 +120,23 @@ impl AppSettings {
             .init();
     }
 
-    fn load_config_file(file_path: &Path) -> Result<FullConfig> {
-        if file_path.exists() {
-            info!(file = file_path.to_str(); "Using specified file");
-            serde_json5::from_str(&std::fs::read_to_string(file_path).map_err(Report::new)?)
-                .map_err(Report::new)
-        } else {
-            Err(Report::new(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                format!("File not found: {}", file_path.display()),
-            )))
-        }
-    }
-
-    fn load_emitter_config(args: CliArgs) -> Result<Self> {
+    fn load_emitter_config(args: CliArgs) -> anyhow::Result<Self> {
         // start with the baked-in defaults
-        let mut config = EmitterConfig::default()?;
+        let mut config = EmitterConfig::default();
 
         // overwrite with config file from standard location, if present
-        if let Some(proj_dirs) = ProjectDirs::from("com", "ansonvandoren", "protoglot") {
-            let config_file_path = proj_dirs.config_dir().join("config.json5");
-            if config_file_path.exists() {
-                let file_config: FullConfig = Self::load_config_file(&config_file_path)?;
-                if let Some(emitter) = file_config.emitter {
-                    config = emitter;
-                }
-            }
-        }
+        config = config.merge_from(load_default_config_file());
 
         // overwrite with passed-in file, if exists
         if let Some(ref file_path) = args.file {
-            let file_config: FullConfig = Self::load_config_file(&file_path)?;
-            if let Some(emitter) = file_config.emitter {
-                config = emitter;
-            }
+            let file_config: FullConfig = load_config_file(&file_path)?;
+            debug!("Overwriting config with file {}", file_path.display());
+            config = config.merge_from(Some(file_config));
         }
 
         // overwrite with cli args that are present
-        if let Some(host) = args.host {
-            config.host = host;
-        }
-        if let Some(port) = args.port {
-            config.port = port;
-        }
-        if let Some(rate) = args.rate {
-            config.rate = rate;
-        }
-        if let Some(tls) = args.tls {
-            config.tls = tls;
-        }
-        if let Some(protocol) = args.protocol {
-            config.protocol = protocol;
-        }
-        if let Some(message_type) = args.message_type {
-            config.message_type = message_type;
-        }
-        if let Some(num_emitters) = args.num_emitters {
-            config.num_emitters = num_emitters;
-        }
-        if let Some(events_per_cycle) = args.events_per_cycle {
-            config.events_per_cycle = events_per_cycle;
-        }
-        if let Some(num_cycles) = args.num_cycles {
-            config.num_cycles = num_cycles;
-        }
-        if let Some(cycle_delay) = args.cycle_delay {
-            config.cycle_delay = cycle_delay;
-        }
+        let cli_args: PartialEmitterConfig = args.into();
+        let config = config.merge(cli_args);
 
         Ok(AppSettings {
             mode: AppMode::Emitter,
@@ -228,63 +145,500 @@ impl AppSettings {
         })
     }
 
-    fn load_absorber_config(args: CliArgs) -> Result<Self> {
+    fn load_absorber_config(args: CliArgs) -> anyhow::Result<Self> {
         // start with the baked-in defaults
-        let mut config = AbsorberConfig::default()?;
+        let mut config = AbsorberConfig::default();
 
         // overwrite with config file from standard location, if present
-        if let Some(proj_dirs) = ProjectDirs::from("com", "ansonvandoren", "protoglot") {
-            let config_file_path = proj_dirs.config_dir().join("config.json5");
-            if config_file_path.exists() {
-                debug!("Checking for config file at {:?}", config_file_path);
-                let file_config: FullConfig = Self::load_config_file(&config_file_path)?;
-                if let Some(absorber) = file_config.absorber {
-                    debug!("Overwriting config with file");
-                    config = absorber;
-                } else {
-                    debug!("No absorber config in file");
-                }
-            }
-        }
+        config = config.merge_from(load_default_config_file());
 
         // overwrite with passed-in file, if exists
         if let Some(ref file_path) = args.file {
-            debug!("Checking for config file at {:?}", file_path);
-            let file_config: FullConfig = Self::load_config_file(&file_path)?;
-            if let Some(absorber) = file_config.absorber {
-                debug!("Overwriting config with file");
-                config = absorber;
-            }
+            let file_config = load_config_file(&file_path)?;
+            debug!("Overwriting config with file {}", file_path.display());
+            config = config.merge_from(Some(file_config));
         }
 
         // overwrite with cli args that are present
-        if let Some(Commands::Absorber {
-            update_interval,
-            listen_addresses,
-            message_type,
-        }) = &args.command
-        {
-            debug!("Overwriting config with CLI args");
-            if let Some(interval) = update_interval {
-                debug!("Setting update interval to {}", interval);
-                config.update_interval = *interval;
-            }
-            if let Some(addrs) = listen_addresses {
-                config.listen_addresses = addrs
-                    .iter()
-                    .map(|addr| ListenAddress::from_str(addr).unwrap())
-                    .collect();
-                debug!("Setting listen addresses to {:?}", config.listen_addresses);
-            }
-            if let Some(msg_type) = message_type {
-                config.message_type = *msg_type;
-            }
-        }
+        let cli_args: PartialAbsorberConfig = args.command.into();
+        let config = config.merge(cli_args);
 
         Ok(AppSettings {
             mode: AppMode::Absorber,
             emitter: None,
             absorber: Some(config),
         })
+    }
+}
+
+fn load_config_file(file_path: &Path) -> anyhow::Result<FullConfig> {
+    if file_path.exists() {
+        info!(file = file_path.to_str(); "Using specified file");
+        Ok(serde_json5::from_str(&std::fs::read_to_string(file_path)?)?)
+    } else {
+        anyhow::bail!("File not found: '{}", file_path.display());
+    }
+}
+
+fn load_default_config_file() -> Option<FullConfig> {
+    let config_file = default_config_path();
+    if config_file.exists() {
+        debug!("Found config file at {:?}", config_file);
+        return load_config_file(&config_file).ok();
+    }
+    debug!("No config file at {:?}", config_file);
+    None
+}
+
+fn default_config_path() -> PathBuf {
+    let proj_dirs = ProjectDirs::from("com", "ansonvandoren", "protoglot").expect("$HOME directory not found.");
+    proj_dirs.config_dir().join("config.json5")
+}
+
+fn write_default_config(overwrite: bool) -> anyhow::Result<()> {
+    trace!("Writing out config file");
+    let config_file = default_config_path();
+    let fname = config_file.to_string_lossy();
+    let should_write = match (config_file.exists(), overwrite) {
+        (true, false) => {
+            println!("Config file already exists at {fname}. Use '--overwrite true' to replace it.");
+            false
+        }
+        (false, _) => {
+            trace!("No file at '{}', writing out default.", fname);
+            true
+        }
+        (true, true) => {
+            let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_secs();
+            let mut backup_fname = config_file.clone();
+            backup_fname.set_file_name(format!("config.{ts}.json5.bak"));
+            println!(
+                "Backing up existing config to '{}' before writing defaults.",
+                backup_fname.display()
+            );
+            let old = std::fs::read_to_string(&config_file)?;
+            std::fs::write(&backup_fname, old)?;
+            true
+        }
+    };
+
+    if should_write {
+        let default_emitter = EmitterConfig::default();
+        let default_absorber = AbsorberConfig::default();
+        let cfg = FullConfig {
+            emitter: Some(default_emitter.into()),
+            absorber: Some(default_absorber.into()),
+        };
+        let parent = config_file.parent().unwrap();
+        std::fs::create_dir_all(parent)?;
+        std::fs::write(&config_file, serde_json::to_string_pretty(&cfg)?)?;
+        println!("Wrote default configuration to {}", config_file.display())
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod test_config_subcommand {
+    use clap::Parser as _;
+    use pretty_assertions::{assert_eq, assert_ne};
+    use sealed_test::prelude::*;
+
+    use super::*;
+    use crate::config::cli::CliArgs;
+
+    #[sealed_test(env = [("XDG_CONFIG_HOME", "./.config"), ("HOME", "./")])]
+    fn writes_config_file_with_config_subcommand() {
+        let args = ["protoglot", "config"];
+        let args = CliArgs::parse_from(args.iter());
+
+        AppSettings::load(args).unwrap();
+
+        let dir = ProjectDirs::from("com", "ansonvandoren", "protoglot").unwrap();
+        let expected_path = dir.config_dir().join("config.json5");
+        assert!(expected_path.exists());
+    }
+
+    #[sealed_test(env = [("XDG_CONFIG_HOME", "./.config"), ("HOME", "./")])]
+    fn does_not_overwrite() {
+        let args = ["protoglot", "config"];
+        let args = CliArgs::parse_from(args.iter());
+        let dir = ProjectDirs::from("com", "ansonvandoren", "protoglot").unwrap();
+        let expected_path = dir.config_dir().join("config.json5");
+
+        std::fs::create_dir_all(&expected_path.parent().unwrap()).unwrap();
+        std::fs::write(&expected_path, "test").unwrap();
+
+        AppSettings::load(args).unwrap();
+
+        assert!(expected_path.exists());
+        let read_back = std::fs::read_to_string(&expected_path).unwrap();
+        assert_eq!(read_back, "test");
+    }
+
+    #[sealed_test(env = [("XDG_CONFIG_HOME", "./.config"), ("HOME", "./")])]
+    fn does_overwrite() {
+        let args = ["protoglot", "config", "--overwrite", "true"];
+        let args = CliArgs::parse_from(args.iter());
+        let dir = ProjectDirs::from("com", "ansonvandoren", "protoglot").unwrap();
+        let expected_path = dir.config_dir().join("config.json5");
+
+        std::fs::create_dir_all(&expected_path.parent().unwrap()).unwrap();
+        std::fs::write(&expected_path, "test").unwrap();
+
+        AppSettings::load(args).unwrap();
+
+        assert!(expected_path.exists());
+        let read_back = std::fs::read_to_string(&expected_path).unwrap();
+        assert_ne!(read_back, "test");
+        let value: serde_json::Value = serde_json5::from_str(&read_back).expect("Should have been JSON.");
+        let emitter = value.get("emitter");
+        assert!(emitter.is_some());
+        let absorber = value.get("absorber");
+        assert!(absorber.is_some());
+
+        let files = std::fs::read_dir(dir.config_dir()).unwrap();
+        let files = files.map(Result::unwrap).collect::<Vec<_>>();
+        assert!(files.len() > 1);
+        for file in files {
+            let f = file.path();
+            if f != expected_path {
+                // This should be our backup
+                let backup_str = std::fs::read_to_string(f).unwrap();
+                assert_eq!(backup_str, "test");
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod test_load_absorber {
+    use std::path::PathBuf;
+
+    use clap::Parser as _;
+    use pretty_assertions::{assert_eq, assert_matches};
+    use sealed_test::prelude::*;
+
+    use super::*;
+    use crate::config::{cli::CliArgs, MessageType};
+
+    #[sealed_test(env = [("XDG_CONFIG_HOME", "./.config"), ("HOME", "./")])]
+    fn uses_defaults_when_nothing_else() {
+        let args = ["protoglot", "absorber"];
+        let args = CliArgs::parse_from(args.iter());
+
+        let config = AppSettings::load_absorber_config(args).unwrap();
+
+        assert_matches!(config.mode, AppMode::Absorber);
+        assert!(config.emitter.is_none());
+        let found: AbsorberConfig = config.absorber.unwrap().try_into().unwrap();
+        assert_eq!(found, AbsorberConfig::default());
+    }
+
+    #[sealed_test(env = [("XDG_CONFIG_HOME", "./.config"), ("HOME", "./")])]
+    fn uses_base_config_file() {
+        // write a base config file
+        let config = PartialAbsorberConfig {
+            update_interval: Some(4242),
+            listen_addresses: None,
+            message_type: None,
+        };
+        let config = FullConfig {
+            emitter: None,
+            absorber: Some(config),
+        };
+        let config_dir = ProjectDirs::from("com", "ansonvandoren", "protoglot").unwrap();
+        let config_path = config_dir.config_dir().join("config.json5");
+
+        std::fs::create_dir_all(&config_path.parent().unwrap()).unwrap();
+        let config_as_str = serde_json::to_string(&config).unwrap();
+        std::fs::write(&config_path, config_as_str).unwrap();
+
+        let args = ["protoglot", "absorber"];
+        let args = CliArgs::parse_from(args.iter());
+
+        let config = AppSettings::load_absorber_config(args).unwrap();
+
+        assert_matches!(config.mode, AppMode::Absorber);
+        assert!(config.emitter.is_none());
+        let found: AbsorberConfig = config.absorber.unwrap().try_into().unwrap();
+        assert_matches!(
+            found,
+            AbsorberConfig {
+                update_interval: 4242,
+                message_type,
+                listen_addresses
+            } if message_type == MessageType::Syslog3164 && listen_addresses.is_empty()
+        );
+    }
+
+    #[sealed_test(env = [("XDG_CONFIG_HOME", "./.config"), ("HOME", "./")])]
+    fn merges_other_file_with_base_config() {
+        // write a base config file
+        let config = PartialAbsorberConfig {
+            update_interval: Some(4242),
+            listen_addresses: None,
+            message_type: Some(MessageType::Syslog5424),
+        };
+        let config = FullConfig {
+            emitter: None,
+            absorber: Some(config),
+        };
+        let config_dir = ProjectDirs::from("com", "ansonvandoren", "protoglot").unwrap();
+        let config_path = config_dir.config_dir().join("config.json5");
+        std::fs::create_dir_all(&config_path.parent().unwrap()).unwrap();
+        let config_as_str = serde_json::to_string(&config).unwrap();
+        std::fs::write(&config_path, config_as_str).unwrap();
+
+        // write a 'custom' config file
+        let other_config = PartialAbsorberConfig {
+            update_interval: Some(4243),
+            listen_addresses: None,
+            message_type: None,
+        };
+        let other_config = FullConfig {
+            emitter: None,
+            absorber: Some(other_config),
+        };
+
+        let config_as_str = serde_json::to_string(&other_config).unwrap();
+        std::fs::write(PathBuf::from("./my_config.json5"), config_as_str).unwrap();
+
+        let args = ["protoglot", "--file", "./my_config.json5", "absorber"];
+        let args = CliArgs::parse_from(args.iter());
+
+        let config = AppSettings::load_absorber_config(args).unwrap();
+
+        assert_matches!(config.mode, AppMode::Absorber);
+        assert!(config.emitter.is_none());
+        let found: AbsorberConfig = config.absorber.unwrap().try_into().unwrap();
+        assert_matches!(
+            found,
+            AbsorberConfig {
+                update_interval: 4243,
+                message_type,
+                listen_addresses
+            } if message_type == MessageType::Syslog5424 && listen_addresses.is_empty()
+        );
+    }
+
+    #[sealed_test(env = [("XDG_CONFIG_HOME", "./.config"), ("HOME", "./")])]
+    fn merges_cli_opts_on_top() {
+        // write a base config file
+        let config = PartialAbsorberConfig {
+            update_interval: Some(4242),
+            listen_addresses: None,
+            message_type: Some(MessageType::Syslog5424),
+        };
+        let config = FullConfig {
+            emitter: None,
+            absorber: Some(config),
+        };
+        let config_dir = ProjectDirs::from("com", "ansonvandoren", "protoglot").unwrap();
+        let config_path = config_dir.config_dir().join("config.json5");
+        std::fs::create_dir_all(&config_path.parent().unwrap()).unwrap();
+        let config_as_str = serde_json::to_string(&config).unwrap();
+        std::fs::write(&config_path, config_as_str).unwrap();
+
+        // write a 'custom' config file
+        let other_config = PartialAbsorberConfig {
+            update_interval: Some(4243),
+            listen_addresses: None,
+            message_type: None,
+        };
+        let other_config = FullConfig {
+            emitter: None,
+            absorber: Some(other_config),
+        };
+
+        let config_as_str = serde_json::to_string(&other_config).unwrap();
+        std::fs::write(PathBuf::from("./my_config.json5"), config_as_str).unwrap();
+
+        let args = [
+            "protoglot",
+            "--file",
+            "./my_config.json5",
+            "absorber",
+            "--update-interval",
+            "5000",
+            "--message-type",
+            "nd-json",
+        ];
+        let args = CliArgs::parse_from(args.iter());
+
+        let config = AppSettings::load_absorber_config(args).unwrap();
+
+        assert_matches!(config.mode, AppMode::Absorber);
+        assert!(config.emitter.is_none());
+        let found: AbsorberConfig = config.absorber.unwrap().try_into().unwrap();
+        assert_matches!(
+            found,
+            AbsorberConfig {
+                update_interval: 5000,
+                message_type,
+                listen_addresses
+            } if message_type == MessageType::NdJson && listen_addresses.is_empty()
+        );
+    }
+}
+
+#[cfg(test)]
+mod test_load_emitter {
+    use std::path::PathBuf;
+
+    use clap::Parser as _;
+    use pretty_assertions::{assert_eq, assert_matches, assert_ne};
+    use sealed_test::prelude::*;
+
+    use super::*;
+    use crate::config::cli::CliArgs;
+
+    #[sealed_test(env = [("XDG_CONFIG_HOME", "./.config"), ("HOME", "./")])]
+    fn uses_defaults_when_nothing_else() {
+        let args = ["protoglot"];
+        let args = CliArgs::parse_from(args.iter());
+
+        let config = AppSettings::load_emitter_config(args).unwrap();
+
+        assert_matches!(config.mode, AppMode::Emitter);
+        assert!(config.absorber.is_none());
+        let found: EmitterConfig = config.emitter.unwrap().try_into().unwrap();
+        assert_eq!(found, EmitterConfig::default());
+    }
+
+    #[sealed_test(env = [("XDG_CONFIG_HOME", "./.config"), ("HOME", "./")])]
+    fn uses_base_config_file() {
+        // write a base config file
+        let config = PartialEmitterConfig {
+            port: Some(4242),
+            ..PartialEmitterConfig::default()
+        };
+        assert_ne!(EmitterConfig::default().port, 4242);
+        let config = FullConfig {
+            absorber: None,
+            emitter: Some(config),
+        };
+        let config_dir = ProjectDirs::from("com", "ansonvandoren", "protoglot").unwrap();
+        let config_path = config_dir.config_dir().join("config.json5");
+
+        std::fs::create_dir_all(&config_path.parent().unwrap()).unwrap();
+        let config_as_str = serde_json::to_string(&config).unwrap();
+        std::fs::write(&config_path, config_as_str).unwrap();
+
+        let args = ["protoglot"];
+        let args = CliArgs::parse_from(args.iter());
+
+        let config = AppSettings::load_emitter_config(args).unwrap();
+
+        assert_matches!(config.mode, AppMode::Emitter);
+        assert!(config.absorber.is_none());
+        let found: EmitterConfig = config.emitter.unwrap().try_into().unwrap();
+        assert_matches!(found, EmitterConfig { port: 4242, .. });
+    }
+
+    #[sealed_test(env = [("XDG_CONFIG_HOME", "./.config"), ("HOME", "./")])]
+    fn merges_other_file_with_base_config() {
+        // write a base config file
+        let config = PartialEmitterConfig {
+            port: Some(4242),
+            host: Some("icanhashostname.com".into()),
+            ..Default::default()
+        };
+        let config = FullConfig {
+            absorber: None,
+            emitter: Some(config),
+        };
+        let config_dir = ProjectDirs::from("com", "ansonvandoren", "protoglot").unwrap();
+        let config_path = config_dir.config_dir().join("config.json5");
+        std::fs::create_dir_all(&config_path.parent().unwrap()).unwrap();
+        let config_as_str = serde_json::to_string(&config).unwrap();
+        std::fs::write(&config_path, config_as_str).unwrap();
+
+        // write a 'custom' config file
+        let other_config = PartialEmitterConfig {
+            port: Some(4243),
+            ..Default::default()
+        };
+        let other_config = FullConfig {
+            absorber: None,
+            emitter: Some(other_config),
+        };
+
+        let config_as_str = serde_json::to_string(&other_config).unwrap();
+        std::fs::write(PathBuf::from("./my_config.json5"), config_as_str).unwrap();
+
+        let args = ["protoglot", "--file", "./my_config.json5", "absorber"];
+        let args = CliArgs::parse_from(args.iter());
+
+        let config = AppSettings::load_emitter_config(args).unwrap();
+
+        assert_matches!(config.mode, AppMode::Emitter);
+        assert!(config.absorber.is_none());
+        let found: EmitterConfig = config.emitter.unwrap().try_into().unwrap();
+        assert_matches!(
+            found,
+            EmitterConfig {
+                port: 4243,
+                host,
+                ..
+            } if host == "icanhashostname.com".to_string()
+        );
+    }
+
+    #[sealed_test(env = [("XDG_CONFIG_HOME", "./.config"), ("HOME", "./")])]
+    fn merges_cli_opts_on_top() {
+        // write a base config file
+        let config = PartialEmitterConfig {
+            port: Some(4242),
+            host: Some("icanhashostname.com".into()),
+            ..PartialEmitterConfig::default()
+        };
+        let config = FullConfig {
+            absorber: None,
+            emitter: Some(config),
+        };
+        let config_dir = ProjectDirs::from("com", "ansonvandoren", "protoglot").unwrap();
+        let config_path = config_dir.config_dir().join("config.json5");
+        std::fs::create_dir_all(&config_path.parent().unwrap()).unwrap();
+        let config_as_str = serde_json::to_string(&config).unwrap();
+        std::fs::write(&config_path, config_as_str).unwrap();
+
+        // write a 'custom' config file
+        let other_config = PartialEmitterConfig {
+            port: Some(4243),
+            ..Default::default()
+        };
+        let other_config = FullConfig {
+            absorber: None,
+            emitter: Some(other_config),
+        };
+
+        let config_as_str = serde_json::to_string(&other_config).unwrap();
+        std::fs::write(PathBuf::from("./my_config.json5"), config_as_str).unwrap();
+
+        let args = [
+            "protoglot",
+            "--file",
+            "./my_config.json5",
+            "--port",
+            "11000",
+            "--host",
+            "someotherhostname.com",
+        ];
+        let args = CliArgs::parse_from(args.iter());
+
+        let config = AppSettings::load_emitter_config(args).unwrap();
+
+        assert_matches!(config.mode, AppMode::Emitter);
+        assert!(config.absorber.is_none());
+        let found: EmitterConfig = config.emitter.unwrap().try_into().unwrap();
+        assert_matches!(
+            found,
+            EmitterConfig {
+                port: 11000,
+                host,
+                ..
+            } if host == "someotherhostname.com".to_string()
+        );
     }
 }

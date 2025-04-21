@@ -6,6 +6,8 @@ mod transports;
 
 use std::sync::Arc;
 
+use clap::Parser as _;
+use config::AppMode;
 use emitter::{Emitter, EmitterConfig};
 use generators::create_generator;
 use log::{error, info};
@@ -15,10 +17,14 @@ use crate::{absorber::Absorber, config::AppSettings};
 
 #[tokio::main]
 async fn main() -> tokio::io::Result<()> {
-    let config = AppSettings::load().unwrap_or_else(|err| {
+    let args = config::cli::CliArgs::parse();
+    let config = AppSettings::load(args).unwrap_or_else(|err| {
         error!("Failed to load configuration: {}", err);
         std::process::exit(1);
     });
+    if matches!(config.mode, AppMode::Config) {
+        return Ok(());
+    }
     if !log::log_enabled!(log::Level::Info) {
         println!("Resolved configuration, starting... Use -v[vv] to see more logs");
     }
@@ -30,8 +36,7 @@ async fn main() -> tokio::io::Result<()> {
         let message_generator = Arc::new(generators::RandomStringGenerator::new());
         for _ in 0..emitter_config.num_emitters {
             let transport = create_transport(&emitter_config).await?;
-            let generator =
-                create_generator(&emitter_config.message_type, message_generator.clone());
+            let generator = create_generator(&emitter_config.message_type, message_generator.clone());
             let emitter_config = EmitterConfig {
                 rate: emitter_config.rate,
                 num_cycles: emitter_config.num_cycles,

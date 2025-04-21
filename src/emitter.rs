@@ -56,6 +56,7 @@ where
         info!(emitter=self.transport.to_string(); "{}/s average", formatted_bytes);
         Ok(())
     }
+
     pub fn new(transport: T, generator: G, config: EmitterConfig) -> Self {
         Emitter {
             transport,

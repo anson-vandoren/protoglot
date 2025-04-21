@@ -1,10 +1,11 @@
-use std::fmt;
-use std::sync::Arc;
+use std::{fmt, sync::Arc};
 
 use log::{debug, error};
 use rustls::{pki_types::ServerName, ClientConfig, RootCertStore};
-use tokio::net::TcpStream;
-use tokio::time::{self, Duration};
+use tokio::{
+    net::TcpStream,
+    time::{self, Duration},
+};
 use tokio_rustls::TlsConnector;
 
 use super::Transport;
@@ -25,17 +26,14 @@ impl TcpTlsTransport {
             root_store.add(cert).unwrap();
         }
 
-        let config = ClientConfig::builder()
-            .with_root_certificates(root_store)
-            .with_no_client_auth();
+        let config = ClientConfig::builder().with_root_certificates(root_store).with_no_client_auth();
 
         let connector = TlsConnector::from(Arc::new(config));
 
         match TcpStream::connect(&addr).await {
             Ok(tcp_stream) => {
                 let handshake_duration = Duration::from_secs(5);
-                let handshake_result =
-                    time::timeout(handshake_duration, connector.connect(domain, tcp_stream)).await;
+                let handshake_result = time::timeout(handshake_duration, connector.connect(domain, tcp_stream)).await;
                 match handshake_result {
                     Ok(Ok(stream)) => {
                         debug!("TLS handshake succeeded to {}", addr);
@@ -47,10 +45,7 @@ impl TcpTlsTransport {
                     }
                     Err(_) => {
                         error!("TLS handshake timed out to {}", addr);
-                        Err(tokio::io::Error::new(
-                            tokio::io::ErrorKind::TimedOut,
-                            "TLS handshake timed out",
-                        ))
+                        Err(tokio::io::Error::new(tokio::io::ErrorKind::TimedOut, "TLS handshake timed out"))
                     }
                 }
             }

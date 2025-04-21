@@ -26,10 +26,7 @@ impl Transport for TransportType {
 }
 
 pub trait Transport: Send {
-    fn send(
-        &mut self,
-        data: Vec<u8>,
-    ) -> impl std::future::Future<Output = tokio::io::Result<()>> + Send;
+    fn send(&mut self, data: Vec<u8>) -> impl std::future::Future<Output = tokio::io::Result<()>> + Send;
 }
 
 impl fmt::Display for TransportType {

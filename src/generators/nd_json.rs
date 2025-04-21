@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
-use super::{Event, EventGenerator, RandomStringGenerator};
 use rand::Rng;
 use uuid::Uuid;
+
+use super::{Event, EventGenerator, RandomStringGenerator};
 
 pub struct NdJson {
     pub timestamp: chrono::DateTime<chrono::Utc>,
@@ -18,14 +19,10 @@ impl Event for NdJson {
         let time_string = self.timestamp.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string();
 
         format!(
-      "{{\"timestamp\":\"{}\",\"hostname\":\"{}\",\"app_name\":\"{}\",\"pid\":{},\"message\":\"{}\"}}\n",
-      time_string,
-      self.hostname,
-      self.app_name,
-      self.pid,
-      self.message,
-    )
-    .into_bytes()
+            "{{\"timestamp\":\"{}\",\"hostname\":\"{}\",\"app_name\":\"{}\",\"pid\":{},\"message\":\"{}\"}}\n",
+            time_string, self.hostname, self.app_name, self.pid, self.message,
+        )
+        .into_bytes()
     }
 }
 
@@ -45,15 +42,10 @@ impl NdJsonEventGenerator {
 
 impl EventGenerator for NdJsonEventGenerator {
     fn generate(&mut self) -> Box<dyn Event + Send> {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let message = self.message_generator.generate_message();
         // prepend incrementing index and a uuidv4
-        let message = format!(
-            "idx={}, uuid={}, msg={}",
-            self.message_index,
-            Uuid::new_v4(),
-            message
-        );
+        let message = format!("idx={}, uuid={}, msg={}", self.message_index, Uuid::new_v4(), message);
         self.message_index += 1;
 
         Box::new(NdJson {
@@ -61,7 +53,7 @@ impl EventGenerator for NdJsonEventGenerator {
             message,
             hostname: "example.com".to_string(),
             app_name: "example".to_string(),
-            pid: rng.gen_range(1000..9999),
+            pid: rng.random_range(1000..9999),
         })
     }
 }

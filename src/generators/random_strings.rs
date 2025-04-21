@@ -1,5 +1,6 @@
-use rand::prelude::*;
 use std::sync::Arc;
+
+use rand::Rng as _;
 
 pub struct RandomStringGenerator {
     messages: Arc<Vec<String>>,
@@ -26,11 +27,7 @@ impl RandomStringGenerator {
         };
         let content = include_str!("../../config/appnames.txt");
         let appnames: Vec<String> = content.lines().map(|s| s.to_string()).collect();
-        let appnames = if appnames.is_empty() {
-            vec!["myapp".to_string()]
-        } else {
-            appnames
-        };
+        let appnames = if appnames.is_empty() { vec!["myapp".to_string()] } else { appnames };
         Self {
             messages: Arc::new(messages),
             hostnames: Arc::new(hostnames),
@@ -39,17 +36,17 @@ impl RandomStringGenerator {
     }
 
     pub fn generate_message(&self) -> String {
-        let mut rng = thread_rng();
-        self.messages[rng.gen_range(0..self.messages.len())].clone()
+        let mut rng = rand::rng();
+        self.messages[rng.random_range(0..self.messages.len())].clone()
     }
 
     pub fn generate_hostname(&self) -> String {
-        let mut rng = thread_rng();
-        self.hostnames[rng.gen_range(0..self.hostnames.len())].clone()
+        let mut rng = rand::rng();
+        self.hostnames[rng.random_range(0..self.hostnames.len())].clone()
     }
 
     pub fn generate_appname(&self) -> String {
-        let mut rng = thread_rng();
-        self.appnames[rng.gen_range(0..self.appnames.len())].clone()
+        let mut rng = rand::rng();
+        self.appnames[rng.random_range(0..self.appnames.len())].clone()
     }
 }

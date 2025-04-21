@@ -35,17 +35,10 @@ pub trait EventGenerator {
     fn generate(&mut self) -> Box<dyn Event + Send>;
 }
 
-pub fn create_generator(
-    message_type: &MessageType,
-    message_generator: Arc<random_strings::RandomStringGenerator>,
-) -> EventType {
+pub fn create_generator(message_type: &MessageType, message_generator: Arc<random_strings::RandomStringGenerator>) -> EventType {
     match message_type {
-        MessageType::Syslog3164 => {
-            EventType::Syslog3164(Syslog3164EventGenerator::new(message_generator))
-        }
-        MessageType::Syslog5424 => {
-            EventType::Syslog5424(Syslog5424EventGenerator::new(message_generator))
-        }
+        MessageType::Syslog3164 => EventType::Syslog3164(Syslog3164EventGenerator::new(message_generator)),
+        MessageType::Syslog5424 => EventType::Syslog5424(Syslog5424EventGenerator::new(message_generator)),
         MessageType::NdJson => EventType::NdJson(NdJsonEventGenerator::new(message_generator)),
     }
 }

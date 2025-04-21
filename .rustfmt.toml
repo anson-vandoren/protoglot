@@ -1,0 +1,12 @@
+max_width = 140
+
+unstable_features = true
+condense_wildcard_suffixes = true
+format_macro_matchers = true
+format_macro_bodies = true
+hex_literal_case = "Lower"
+imports_granularity = "Crate"
+normalize_comments = true
+reorder_impl_items = true
+group_imports = "StdExternalCrate"
+format_strings = true

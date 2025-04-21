@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
-use super::{Event, EventGenerator, RandomStringGenerator};
-
 use chrono;
 use rand::Rng;
 use uuid::Uuid;
+
+use super::{Event, EventGenerator, RandomStringGenerator};
 
 pub struct Syslog5424 {
     pub timestamp: chrono::DateTime<chrono::Utc>,
@@ -52,15 +52,10 @@ impl Syslog5424EventGenerator {
 
 impl EventGenerator for Syslog5424EventGenerator {
     fn generate(&mut self) -> Box<dyn Event + Send> {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let message = self.message_generator.generate_message();
         // prepend incrementing index and a uuidv4
-        let message = format!(
-            "idx={}, uuid={}, msg={}",
-            self.message_index,
-            Uuid::new_v4(),
-            message
-        );
+        let message = format!("idx={}, uuid={}, msg={}", self.message_index, Uuid::new_v4(), message);
         self.message_index += 1;
         Box::new(Syslog5424 {
             timestamp: chrono::Utc::now(),
@@ -68,7 +63,7 @@ impl EventGenerator for Syslog5424EventGenerator {
             facility: 1, // user-level messages
             severity: 6, // informational severity
             app_name: self.message_generator.generate_appname(),
-            pid: rng.gen_range(0..std::u16::MAX),
+            pid: rng.random_range(0..std::u16::MAX),
             hostname: self.message_generator.generate_hostname(),
         })
     }
@@ -76,8 +71,9 @@ impl EventGenerator for Syslog5424EventGenerator {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use chrono::TimeZone;
+
+    use super::*;
 
     #[test]
     fn test_serialization() {
@@ -92,10 +88,7 @@ mod tests {
         };
 
         let serialized = String::from_utf8(event.serialize()).unwrap();
-        assert_eq!(
-            serialized,
-            "<14>1 2024-07-08T09:10:11.000Z localhost test 1234 - - Hello, world!\n"
-        );
+        assert_eq!(serialized, "<14>1 2024-07-08T09:10:11.000Z localhost test 1234 - - Hello, world!\n");
     }
 
     use proptest::prelude::*;

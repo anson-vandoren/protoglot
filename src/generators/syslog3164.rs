@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
-use super::{Event, EventGenerator, RandomStringGenerator};
-
 use chrono;
-use rand::Rng;
+use rand::Rng as _;
 use uuid::Uuid;
+
+use super::{Event, EventGenerator, RandomStringGenerator};
 
 pub struct Syslog3164 {
     pub timestamp: chrono::DateTime<chrono::Utc>,
@@ -50,23 +50,18 @@ impl Syslog3164EventGenerator {
 
 impl EventGenerator for Syslog3164EventGenerator {
     fn generate(&mut self) -> Box<dyn Event + Send> {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let message = self.message_generator.generate_message();
         // prepend incrementing index and a uuidv4
-        let message = format!(
-            "idx={}, uuid={}, msg={}",
-            self.message_index,
-            Uuid::new_v4(),
-            message
-        );
+        let message = format!("idx={}, uuid={}, msg={}", self.message_index, Uuid::new_v4(), message);
         self.message_index += 1;
         Box::new(Syslog3164 {
             timestamp: chrono::Utc::now(),
             message,
-            facility: rng.gen_range(0..24),
-            severity: rng.gen_range(0..8),
+            facility: rng.random_range(0..24),
+            severity: rng.random_range(0..8),
             app_name: self.message_generator.generate_appname(),
-            pid: rng.gen_range(0..std::u16::MAX),
+            pid: rng.random_range(0..std::u16::MAX),
             hostname: self.message_generator.generate_hostname(),
         })
     }
@@ -74,15 +69,14 @@ impl EventGenerator for Syslog3164EventGenerator {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use chrono::TimeZone;
+
+    use super::*;
 
     #[test]
     fn test_serialization() {
         let event = Syslog3164 {
-            timestamp: chrono::Utc
-                .with_ymd_and_hms(20024, 7, 8, 9, 10, 11)
-                .unwrap(),
+            timestamp: chrono::Utc.with_ymd_and_hms(20024, 7, 8, 9, 10, 11).unwrap(),
             message: "test message".to_string(),
             facility: 1,
             severity: 5,
@@ -91,9 +85,6 @@ mod tests {
             hostname: "test_host".to_string(),
         };
         let serialized = String::from_utf8(event.serialize()).unwrap();
-        assert_eq!(
-            serialized,
-            "<13>Jul  8 09:10:11 test_host test_app[1234]: test message\n"
-        );
+        assert_eq!(serialized, "<13>Jul  8 09:10:11 test_host test_app[1234]: test message\n");
     }
 }

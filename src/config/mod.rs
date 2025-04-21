@@ -1,6 +1,9 @@
-mod cli;
+pub mod absorber;
+pub mod cli;
 mod config;
+pub mod emitter;
 mod types;
 
-pub use config::{AbsorberConfig, AppSettings, EmitterConfig, ListenAddress};
-pub(crate) use types::{MessageType, Protocol};
+pub use config::{AppMode, AppSettings, ListenAddress};
+pub use emitter::EmitterConfig;
+pub use types::{MessageType, Protocol};
