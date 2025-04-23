@@ -1,8 +1,6 @@
-use std::sync::Arc;
+use tokio::net::UdpSocket;
 
-use tokio::{net::UdpSocket, sync::Mutex};
-
-use super::absorber::{process_message, AbsorberInner, AbsorberStats};
+use super::{process_message, AbsorberInner, StatsSvc};
 use crate::config::MessageType;
 
 pub struct UdpAbsorber {
@@ -18,12 +16,12 @@ impl UdpAbsorber {
         Self { listener, message_type }
     }
 
-    pub async fn run(self, stats: Arc<Mutex<AbsorberStats>>) -> anyhow::Result<()> {
+    pub(super) async fn run(self, stats: StatsSvc) -> anyhow::Result<()> {
         let mut buf = [0; 65535];
         loop {
             let (len, _) = self.listener.recv_from(&mut buf).await?;
             let message = &buf[..len];
-            process_message(message, stats.clone(), &self.message_type).await;
+            process_message(message, &stats.clone(), &self.message_type).await;
         }
     }
 }

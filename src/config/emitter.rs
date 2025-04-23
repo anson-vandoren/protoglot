@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use super::{cli::CliArgs, config::FullConfig, MessageType, Protocol};
+use super::{cli::CliArgs, FullConfig, MessageType, Protocol};
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]

@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use chrono;
 use rand::Rng as _;
 use uuid::Uuid;
 
@@ -61,7 +60,7 @@ impl EventGenerator for Syslog3164EventGenerator {
             facility: rng.random_range(0..24),
             severity: rng.random_range(0..8),
             app_name: self.message_generator.generate_appname(),
-            pid: rng.random_range(0..std::u16::MAX),
+            pid: rng.random_range(0..u16::MAX),
             hostname: self.message_generator.generate_hostname(),
         })
     }

@@ -35,7 +35,7 @@ async fn main() -> tokio::io::Result<()> {
     if let Some(emitter_config) = &config.emitter {
         let message_generator = Arc::new(generators::RandomStringGenerator::new());
         for _ in 0..emitter_config.num_emitters {
-            let transport = create_transport(&emitter_config).await?;
+            let transport = create_transport(emitter_config).await?;
             let generator = create_generator(&emitter_config.message_type, message_generator.clone());
             let emitter_config = EmitterConfig {
                 rate: emitter_config.rate,

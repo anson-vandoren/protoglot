@@ -1,18 +1,12 @@
-use std::sync::Arc;
-
 use http_body_util::BodyExt;
-use hyper::{
-    server::conn::{http1, http2},
-    service::service_fn,
-    Request, Response,
-};
-use hyper_util::rt::{TokioExecutor, TokioIo};
+use hyper::{server::conn::http1, service::service_fn, Request, Response};
+use hyper_util::rt::TokioIo;
 use log::{error, info};
-use tokio::{net::TcpListener, sync::Mutex};
+use tokio::net::TcpListener;
 use tokio_stream::{wrappers::TcpListenerStream, StreamExt};
 
-use super::absorber::{extract_message, AbsorberInner, AbsorberStats};
-use crate::{absorber::absorber::validate_message, config::MessageType};
+use super::{extract_message, validate_message, AbsorberInner, StatsSvc};
+use crate::config::MessageType;
 
 pub struct HttpAbsorber {
     address: String,
@@ -29,7 +23,7 @@ impl HttpAbsorber {
         }
     }
 
-    pub async fn run(self, stats: Arc<Mutex<AbsorberStats>>) -> anyhow::Result<()> {
+    pub(super) async fn run(self, stats: StatsSvc) -> anyhow::Result<()> {
         let listener = TcpListener::bind(format!("{}:{}", self.address, self.port))
             .await
             .expect("Could not bind to TCP address & port");
@@ -41,15 +35,15 @@ impl HttpAbsorber {
                     let remote_addr = s.peer_addr().unwrap();
                     info!("Accepted new connection from {}", remote_addr);
                     let message_type = self.message_type.clone();
-                    let stats = Arc::clone(&stats);
 
                     let io = TokioIo::new(s);
+                    let stats = stats.clone();
                     tokio::spawn(async move {
                         let message_type = message_type.clone();
                         let service = service_fn(|req| handle_request(req, stats.clone(), message_type.clone()));
-                        //if let Err(err) = http1::Builder::new().serve_connection(io, service).await {
-                        // TODO: auto if HTTP2 isn't explicitly requested?
-                        if let Err(err) = http2::Builder::new(TokioExecutor::new()).serve_connection(io, service).await {
+                        if let Err(err) = http1::Builder::new().serve_connection(io, service).await {
+                            // TODO: auto if HTTP2 isn't explicitly requested?
+                            //if let Err(err) = http2::Builder::new(TokioExecutor::new()).serve_connection(io, service).await {
                             error!("Error while receiving HTTP stream from {remote_addr}: {:?}", err);
                         }
                         info!("Connection closed: {remote_addr}");
@@ -67,27 +61,21 @@ impl HttpAbsorber {
 
 async fn handle_request(
     req: Request<hyper::body::Incoming>,
-    stats: Arc<Mutex<AbsorberStats>>,
+    stats: StatsSvc,
     message_type: MessageType,
 ) -> Result<Response<String>, hyper::Error> {
     let mut body = req.into_data_stream();
     let mut events = 0;
-    let mut bytes: u64 = 0;
+    let mut bytes = 0;
     while let Some(msg) = body.next().await {
         let mut msg = msg.unwrap().to_vec();
         while let Some(message) = extract_message(&mut msg) {
             validate_message(&message, &message_type);
             events += 1;
-            bytes += message.len() as u64;
+            bytes += message.len();
         }
     }
-    {
-        let mut stats = stats.lock().await;
-        stats.total_events += events;
-        stats.intv_events += events;
-        stats.total_bytes += bytes;
-        stats.intv_bytes += bytes;
-    }
+    stats.increment(events, bytes).await;
 
     Ok(Response::new("OK".to_string()))
 }

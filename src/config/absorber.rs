@@ -1,7 +1,7 @@
 use log::warn;
 use serde::{Deserialize, Serialize};
 
-use super::{cli::Commands, config::FullConfig, ListenAddress, MessageType};
+use super::{cli::Commands, FullConfig, ListenAddress, MessageType};
 
 #[derive(Serialize, Clone, Deserialize, Debug, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
