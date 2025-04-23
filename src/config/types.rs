@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 pub enum Protocol {
     Tcp,
     Udp,
+    Http,
 }
 
 impl std::fmt::Display for Protocol {
@@ -13,6 +14,7 @@ impl std::fmt::Display for Protocol {
         let s = match self {
             Protocol::Tcp => "tcp",
             Protocol::Udp => "udp",
+            Protocol::Http => "http",
         };
         s.fmt(f)
     }
@@ -25,6 +27,7 @@ impl TryFrom<&str> for Protocol {
         match value.to_lowercase().as_str() {
             "tcp" => Ok(Protocol::Tcp),
             "udp" => Ok(Protocol::Udp),
+            "http" => Ok(Protocol::Http),
             _ => Err(anyhow::anyhow!("Invalid protocol {value}")),
         }
     }

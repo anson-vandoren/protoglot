@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use tokio::{net::UdpSocket, sync::Mutex};
 
-use super::absorber::{validate_message, AbsorberInner, AbsorberStats};
+use super::absorber::{process_message, AbsorberInner, AbsorberStats};
 use crate::config::MessageType;
 
 pub struct UdpAbsorber {
@@ -23,19 +23,7 @@ impl UdpAbsorber {
         loop {
             let (len, _) = self.listener.recv_from(&mut buf).await?;
             let message = &buf[..len];
-            self.process_message(message, stats.clone()).await;
-        }
-    }
-
-    async fn process_message(&self, message: &[u8], stats: Arc<Mutex<AbsorberStats>>) {
-        // Validate and process the message
-        if validate_message(message, &self.message_type) {
-            let mut stats = stats.lock().await;
-            stats.total_events += 1;
-            stats.intv_events += 1;
-            let message_len = message.len() as u64;
-            stats.total_bytes += message_len;
-            stats.intv_bytes += message_len;
+            process_message(message, stats.clone(), &self.message_type).await;
         }
     }
 }

@@ -1,9 +1,10 @@
 use std::sync::Arc;
 
 use human_bytes::human_bytes;
+use log::warn;
 use tokio::sync::Mutex;
 
-use super::{tcp::TcpAbsorber, udp::UdpAbsorber};
+use super::{http::HttpAbsorber, tcp::TcpAbsorber, udp::UdpAbsorber};
 use crate::config::{absorber::AbsorberConfig, MessageType, Protocol};
 
 #[derive(Clone)]
@@ -15,6 +16,7 @@ pub struct Absorber {
 pub enum AbsorberInner {
     Tcp(TcpAbsorber),
     Udp(UdpAbsorber),
+    Http(HttpAbsorber),
 }
 
 impl AbsorberInner {
@@ -22,6 +24,7 @@ impl AbsorberInner {
         match protocol {
             Protocol::Tcp => TcpAbsorber::build(address, port, message_type).await.into(),
             Protocol::Udp => UdpAbsorber::build(address, port, message_type).await.into(),
+            Protocol::Http => HttpAbsorber::build(address, port, message_type).await.into(),
         }
     }
 
@@ -29,6 +32,7 @@ impl AbsorberInner {
         match self {
             Self::Tcp(absorber) => absorber.run(stats).await,
             Self::Udp(absorber) => absorber.run(stats).await,
+            Self::Http(absorber) => absorber.run(stats).await,
         }
     }
 }
@@ -127,6 +131,20 @@ async fn handle_user_input(stats: Arc<Mutex<AbsorberStats>>) -> anyhow::Result<(
             }
         }
         input.clear();
+    }
+}
+
+pub(super) async fn process_message(message: &[u8], stats: Arc<Mutex<AbsorberStats>>, message_type: &MessageType) {
+    // Validate and process the message
+    if validate_message(message, message_type) {
+        let mut stats = stats.lock().await;
+        stats.total_events += 1;
+        stats.intv_events += 1;
+        let message_len = message.len() as u64;
+        stats.total_bytes += message_len;
+        stats.intv_bytes += message_len;
+    } else {
+        warn!("Failed to validate message");
     }
 }
 

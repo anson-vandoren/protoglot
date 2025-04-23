@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use clap::{Parser, Subcommand};
+use clap::{ArgAction, Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 
 use super::{MessageType, Protocol};
@@ -87,9 +87,31 @@ pub enum Commands {
         listen_addresses: Option<Vec<String>>,
 
         /// Message type
-        #[arg(long)]
+        #[arg(long = "message-type")]
         #[serde(skip_serializing_if = "Option::is_none")]
         message_type: Option<MessageType>,
+
+        /// HTTP2-only server (if listening for HTTP). This implies HTTPS and is mutually exclusive
+        /// with the --https flag
+        #[arg(long, action = ArgAction::SetTrue, conflicts_with = "https")]
+        http2: Option<bool>,
+
+        /// HTTPS/1.1-only server (if listening for HTTP). With no other flags set, this will use
+        /// local.fucktls.com certs. Mutually exclusive with the --http2 flag
+        #[arg(long, action = ArgAction::SetTrue, conflicts_with = "http2")]
+        https: Option<bool>,
+
+        /// Use a plain self-signed server cert (if listening for HTTP and either HTTP2 or HTTPS is
+        /// enabled). Mutually exclusive with --private-ca flag.
+        #[arg(long = "self-signed", action = ArgAction::SetTrue, conflicts_with = "private_ca")]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        self_signed: Option<bool>,
+
+        /// Use an internally-generated private CA cert to sign the server cert (if listening for
+        /// HTTP and either HTTP2 or HTTPS is enabled). Mutually exclusive with --self-signed flag.
+        #[arg(long = "private-ca", action = ArgAction::SetTrue, conflicts_with = "self_signed")]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        private_ca: Option<bool>,
     },
 
     /// Write the default config to expected path, if one does not already exist

@@ -7,8 +7,8 @@ use tokio::{
     sync::Mutex,
 };
 
-use super::absorber::{extract_message, validate_message, AbsorberInner, AbsorberStats};
-use crate::config::MessageType;
+use super::absorber::{extract_message, AbsorberInner, AbsorberStats};
+use crate::{absorber::absorber::process_message, config::MessageType};
 
 pub struct TcpAbsorber {
     address: String,
@@ -67,18 +67,6 @@ async fn handle_tcp_connection(
         }
     }
     Ok(())
-}
-
-async fn process_message(message: &[u8], stats: Arc<Mutex<AbsorberStats>>, message_type: &MessageType) {
-    // Validate and process the message
-    if validate_message(message, message_type) {
-        let mut stats = stats.lock().await;
-        stats.total_events += 1;
-        stats.intv_events += 1;
-        let message_len = message.len() as u64;
-        stats.total_bytes += message_len;
-        stats.intv_bytes += message_len;
-    }
 }
 
 impl From<TcpAbsorber> for AbsorberInner {

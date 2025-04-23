@@ -67,5 +67,6 @@ pub async fn create_transport(config: &EmitterConfig) -> tokio::io::Result<Trans
                 Err(err)
             }
         },
+        Protocol::Http => todo!(),
     }
 }

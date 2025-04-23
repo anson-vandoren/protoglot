@@ -161,7 +161,9 @@ impl AppSettings {
 
         // overwrite with cli args that are present
         let cli_args: PartialAbsorberConfig = args.command.into();
+        debug!("CLI args: {:?}", cli_args);
         let config = config.merge(cli_args);
+        debug!("Config after CLI args: {:?}", config);
 
         Ok(AppSettings {
             mode: AppMode::Absorber,
@@ -342,6 +344,7 @@ mod test_load_absorber {
             update_interval: Some(4242),
             listen_addresses: None,
             message_type: None,
+            ..Default::default()
         };
         let config = FullConfig {
             emitter: None,
@@ -367,7 +370,8 @@ mod test_load_absorber {
             AbsorberConfig {
                 update_interval: 4242,
                 message_type,
-                listen_addresses
+                listen_addresses,
+                ..
             } if message_type == MessageType::Syslog3164 && listen_addresses.is_empty()
         );
     }
@@ -379,6 +383,7 @@ mod test_load_absorber {
             update_interval: Some(4242),
             listen_addresses: None,
             message_type: Some(MessageType::Syslog5424),
+            ..Default::default()
         };
         let config = FullConfig {
             emitter: None,
@@ -395,6 +400,7 @@ mod test_load_absorber {
             update_interval: Some(4243),
             listen_addresses: None,
             message_type: None,
+            ..Default::default()
         };
         let other_config = FullConfig {
             emitter: None,
@@ -417,7 +423,8 @@ mod test_load_absorber {
             AbsorberConfig {
                 update_interval: 4243,
                 message_type,
-                listen_addresses
+                listen_addresses,
+                ..
             } if message_type == MessageType::Syslog5424 && listen_addresses.is_empty()
         );
     }
@@ -429,6 +436,7 @@ mod test_load_absorber {
             update_interval: Some(4242),
             listen_addresses: None,
             message_type: Some(MessageType::Syslog5424),
+            ..Default::default()
         };
         let config = FullConfig {
             emitter: None,
@@ -445,6 +453,7 @@ mod test_load_absorber {
             update_interval: Some(4243),
             listen_addresses: None,
             message_type: None,
+            ..Default::default()
         };
         let other_config = FullConfig {
             emitter: None,
@@ -476,7 +485,8 @@ mod test_load_absorber {
             AbsorberConfig {
                 update_interval: 5000,
                 message_type,
-                listen_addresses
+                listen_addresses,
+                ..
             } if message_type == MessageType::NdJson && listen_addresses.is_empty()
         );
     }
