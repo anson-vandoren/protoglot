@@ -1,17 +1,19 @@
+mod certs;
 mod http;
 mod stats_svc;
 mod tcp;
 mod udp;
 
-use std::sync::Arc;
+use std::{ops::Deref, sync::Arc};
 
+use certs::get_cert;
 use http::HttpAbsorber;
 use log::warn;
 use stats_svc::StatsSvc;
 use tcp::TcpAbsorber;
 use udp::UdpAbsorber;
 
-use crate::config::{absorber::AbsorberConfig, MessageType, Protocol};
+use crate::config::{absorber::AbsorberConfig, ListenAddress, MessageType, Protocol};
 
 #[derive(Clone)]
 pub struct Absorber {
@@ -24,12 +26,58 @@ pub enum AbsorberInner {
     Http(HttpAbsorber),
 }
 
+#[derive(Clone, Debug)]
+enum CertType {
+    None,
+    SelfSigned,
+    PrivateCA,
+    PublicCA,
+}
+
+#[derive(Debug)]
+pub struct ConnOptions {
+    http_version: hyper::Version,
+    addr: ListenAddress,
+    cert_type: CertType,
+    protocol: Protocol,
+}
+
+impl From<&AbsorberConfig> for Vec<ConnOptions> {
+    fn from(config: &AbsorberConfig) -> Self {
+        let http_version = match config.http2 {
+            true => hyper::Version::HTTP_2,
+            false => hyper::Version::HTTP_11,
+        };
+        let cert_type = if config.https || config.http2 {
+            if config.self_signed {
+                CertType::SelfSigned
+            } else if config.private_ca {
+                CertType::PrivateCA
+            } else {
+                CertType::PublicCA
+            }
+        } else {
+            CertType::None
+        };
+        config
+            .listen_addresses
+            .iter()
+            .map(|addr| ConnOptions {
+                http_version,
+                addr: addr.clone(),
+                cert_type: cert_type.clone(),
+                protocol: addr.protocol.clone(),
+            })
+            .collect()
+    }
+}
+
 impl AbsorberInner {
-    async fn build(protocol: Protocol, address: &str, port: u16, message_type: MessageType) -> Self {
-        match protocol {
-            Protocol::Tcp => TcpAbsorber::build(address, port, message_type).await.into(),
-            Protocol::Udp => UdpAbsorber::build(address, port, message_type).await.into(),
-            Protocol::Http => HttpAbsorber::build(address, port, message_type).await.into(),
+    async fn build(opts: ConnOptions, message_type: MessageType) -> Self {
+        match opts.protocol {
+            Protocol::Tcp => TcpAbsorber::build(opts, message_type).await.into(),
+            Protocol::Udp => UdpAbsorber::build(opts, message_type).await.into(),
+            Protocol::Http => HttpAbsorber::build(opts, message_type).await.into(),
         }
     }
 
@@ -52,10 +100,10 @@ impl Absorber {
         let update_interval = self.config.update_interval;
         let stats_svc = StatsSvc::run(update_interval);
 
-        for address in &self.config.listen_addresses {
+        let conn_opts: Vec<ConnOptions> = self.config.deref().into();
+        for conn_opt in conn_opts {
             let stats = stats_svc.clone();
-            let address = address.clone();
-            let absorber = AbsorberInner::build(address.protocol, &address.host, address.port, self.config.message_type.clone()).await;
+            let absorber = AbsorberInner::build(conn_opt, self.config.message_type.clone()).await;
             let handle = tokio::spawn(async move { absorber.run(stats).await });
             handles.push(handle);
         }

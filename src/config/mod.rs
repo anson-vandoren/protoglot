@@ -4,6 +4,7 @@ pub mod emitter;
 mod types;
 
 use std::{
+    net::{SocketAddr, ToSocketAddrs},
     path::{Path, PathBuf},
     str::FromStr,
 };
@@ -46,6 +47,14 @@ pub struct ListenAddress {
     pub host: String,
     pub port: u16,
     pub protocol: Protocol,
+}
+
+impl ToSocketAddrs for ListenAddress {
+    type Iter = std::vec::IntoIter<SocketAddr>;
+
+    fn to_socket_addrs(&self) -> std::io::Result<Self::Iter> {
+        (self.host.as_str(), self.port).to_socket_addrs()
+    }
 }
 
 impl Default for ListenAddress {

@@ -1,6 +1,6 @@
 use tokio::net::UdpSocket;
 
-use super::{process_message, AbsorberInner, StatsSvc};
+use super::{process_message, AbsorberInner, ConnOptions, StatsSvc};
 use crate::config::MessageType;
 
 pub struct UdpAbsorber {
@@ -9,7 +9,9 @@ pub struct UdpAbsorber {
 }
 
 impl UdpAbsorber {
-    pub async fn build(address: &str, port: u16, message_type: MessageType) -> Self {
+    pub async fn build(opts: ConnOptions, message_type: MessageType) -> Self {
+        let address = opts.addr.host;
+        let port = opts.addr.port;
         let listener = UdpSocket::bind(format!("{}:{}", address, port))
             .await
             .expect("Could not bind to UDP address & port.");

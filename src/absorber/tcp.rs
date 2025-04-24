@@ -4,7 +4,7 @@ use tokio::{
     net::{TcpListener, TcpStream},
 };
 
-use super::{extract_message, AbsorberInner, StatsSvc};
+use super::{extract_message, AbsorberInner, ConnOptions, StatsSvc};
 use crate::{absorber::process_message, config::MessageType};
 
 pub struct TcpAbsorber {
@@ -14,11 +14,11 @@ pub struct TcpAbsorber {
 }
 
 impl TcpAbsorber {
-    pub async fn build(address: &str, port: u16, message_type: MessageType) -> Self {
+    pub async fn build(opts: ConnOptions, message_type: MessageType) -> Self {
         Self {
             message_type,
-            address: address.to_string(),
-            port,
+            address: opts.addr.host.to_string(),
+            port: opts.addr.port,
         }
     }
 

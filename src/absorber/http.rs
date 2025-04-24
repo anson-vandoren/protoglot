@@ -1,32 +1,47 @@
+use std::sync::Arc;
+
 use http_body_util::BodyExt;
-use hyper::{server::conn::http1, service::service_fn, Request, Response};
+use hyper::{
+    server::conn::{http1, http2},
+    service::service_fn,
+    Request, Response,
+};
 use hyper_util::rt::TokioIo;
-use log::{error, info};
+use log::{debug, error, info};
 use tokio::net::TcpListener;
+use tokio_rustls::TlsAcceptor;
 use tokio_stream::{wrappers::TcpListenerStream, StreamExt};
 
-use super::{extract_message, validate_message, AbsorberInner, StatsSvc};
+use super::{extract_message, get_cert, validate_message, AbsorberInner, ConnOptions, StatsSvc};
 use crate::config::MessageType;
 
 pub struct HttpAbsorber {
-    address: String,
-    port: u16,
+    opts: ConnOptions,
     message_type: MessageType,
 }
 
 impl HttpAbsorber {
-    pub async fn build(address: &str, port: u16, message_type: MessageType) -> Self {
-        Self {
-            message_type,
-            address: address.to_string(),
-            port,
-        }
+    pub async fn build(opts: ConnOptions, message_type: MessageType) -> Self {
+        Self { message_type, opts }
     }
 
     pub(super) async fn run(self, stats: StatsSvc) -> anyhow::Result<()> {
-        let listener = TcpListener::bind(format!("{}:{}", self.address, self.port))
+        debug!("Building a HTTP absorber with opts={:?}", self.opts);
+        let ConnOptions { addr, cert_type, .. } = self.opts;
+        let listener = TcpListener::bind((addr.host, addr.port))
             .await
             .expect("Could not bind to TCP address & port");
+        let cert_key = get_cert(&cert_type).await?;
+        let acceptor = if let Some(cert_key) = cert_key {
+            let key = cert_key.key();
+            let mut config = rustls::ServerConfig::builder()
+                .with_no_client_auth()
+                .with_single_cert(cert_key.cert(), key)?;
+            config.alpn_protocols = vec!["h2".into(), "http/1/1".into()];
+            Some(TlsAcceptor::from(Arc::new(config)))
+        } else {
+            None
+        };
 
         let mut listener = TcpListenerStream::new(listener);
         while let Some(s) = listener.next().await {
@@ -36,17 +51,51 @@ impl HttpAbsorber {
                     info!("Accepted new connection from {}", remote_addr);
                     let message_type = self.message_type.clone();
 
-                    let io = TokioIo::new(s);
                     let stats = stats.clone();
+                    let acceptor = acceptor.clone();
                     tokio::spawn(async move {
                         let message_type = message_type.clone();
                         let service = service_fn(|req| handle_request(req, stats.clone(), message_type.clone()));
-                        if let Err(err) = http1::Builder::new().serve_connection(io, service).await {
-                            // TODO: auto if HTTP2 isn't explicitly requested?
-                            //if let Err(err) = http2::Builder::new(TokioExecutor::new()).serve_connection(io, service).await {
-                            error!("Error while receiving HTTP stream from {remote_addr}: {:?}", err);
+
+                        // Handle either TLS or non-TLS connection
+                        if let Some(tls_acceptor) = acceptor {
+                            // TLS connection
+                            match tls_acceptor.accept(s).await {
+                                Ok(tls_stream) => {
+                                    info!("TLS handshake successful with {remote_addr}");
+                                    let io = TokioIo::new(tls_stream);
+                                    match self.opts.http_version {
+                                        hyper::Version::HTTP_2 => {
+                                            info!("Starting HTTP2 servicer");
+                                            if let Err(err) = http2::Builder::new(hyper_util::rt::TokioExecutor::new())
+                                                .serve_connection(io, service)
+                                                .await
+                                            {
+                                                error!("Error in TLS HTTP stream from {remote_addr}: {:?}", err);
+                                            }
+                                        }
+                                        hyper::Version::HTTP_11 => {
+                                            if let Err(err) = http1::Builder::new().serve_connection(io, service).await {
+                                                error!("Error in TLS HTTP stream from {remote_addr}: {:?}", err);
+                                            }
+                                        }
+                                        ver => anyhow::bail!("Unsupported HTTP version {:?}", ver),
+                                    }
+                                }
+                                Err(err) => {
+                                    anyhow::bail!("TLS handshake failed with {remote_addr}: {:?}", err);
+                                }
+                            }
+                        } else {
+                            // Non-TLS connection
+                            let io = TokioIo::new(s);
+                            if let Err(err) = http1::Builder::new().serve_connection(io, service).await {
+                                anyhow::bail!("Error in plain HTTP stream from {remote_addr}: {:?}", err);
+                            }
                         }
+
                         info!("Connection closed: {remote_addr}");
+                        Ok(())
                     });
                 }
                 Err(e) => {
