@@ -1,6 +1,6 @@
 [package]
 name = "protoglot"
-version = "0.2.1"
+version = "0.3.0"
 authors = ["Anson VanDoren <anson@ansonvandoren.com>"]
 edition = "2021"
 description = "A data generator & load tool, mostly built for testing Cribl Stream\nSet RUST_LOG=[error|warn|info|debug|trace] to see more output."
