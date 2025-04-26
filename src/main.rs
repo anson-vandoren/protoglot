@@ -17,6 +17,7 @@ use crate::{absorber::Absorber, config::AppSettings};
 
 #[tokio::main]
 async fn main() -> tokio::io::Result<()> {
+    rustls::crypto::ring::default_provider().install_default().unwrap();
     let args = config::cli::CliArgs::parse();
     let config = AppSettings::load(args).unwrap_or_else(|err| {
         error!("Failed to load configuration: {}", err);

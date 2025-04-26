@@ -1,16 +1,21 @@
 use std::sync::Arc;
 
-use http_body_util::BodyExt;
+use async_compression::tokio::bufread::GzipDecoder;
+use bytes::Bytes;
+use flate2::bufread::GzDecoder;
+use http_body_util::{BodyExt, StreamBody};
 use hyper::{
+    header::CONTENT_ENCODING,
     server::conn::{http1, http2},
     service::service_fn,
     Request, Response,
 };
 use hyper_util::rt::TokioIo;
 use log::{debug, error, info};
-use tokio::net::TcpListener;
+use tokio::{io::BufReader, net::TcpListener};
 use tokio_rustls::TlsAcceptor;
 use tokio_stream::{wrappers::TcpListenerStream, StreamExt};
+use tokio_util::io::{ReaderStream, StreamReader};
 
 use super::{extract_message, get_cert, validate_message, AbsorberInner, ConnOptions, StatsSvc};
 use crate::config::MessageType;
@@ -37,7 +42,12 @@ impl HttpAbsorber {
             let mut config = rustls::ServerConfig::builder()
                 .with_no_client_auth()
                 .with_single_cert(cert_key.cert(), key)?;
-            config.alpn_protocols = vec!["h2".into(), "http/1/1".into()];
+            if self.opts.http_version == hyper::Version::HTTP_2 {
+                config.alpn_protocols = vec!["h2".into()];
+            } else {
+                config.alpn_protocols = vec!["http/1.1".into()];
+            }
+            //config.alpn_protocols = vec!["h2".into(), "http/1.1".into()];
             Some(TlsAcceptor::from(Arc::new(config)))
         } else {
             None
@@ -113,15 +123,36 @@ async fn handle_request(
     stats: StatsSvc,
     message_type: MessageType,
 ) -> Result<Response<String>, hyper::Error> {
-    let mut body = req.into_data_stream();
+    let is_gzipped = req
+        .headers()
+        .get(CONTENT_ENCODING)
+        .map(|value| value.as_bytes())
+        .map_or(false, |enc| enc.eq_ignore_ascii_case(b"gzip"));
+    let mut body = req.into_body().into_data_stream();
     let mut events = 0;
     let mut bytes = 0;
-    while let Some(msg) = body.next().await {
-        let mut msg = msg.unwrap().to_vec();
-        while let Some(message) = extract_message(&mut msg) {
-            validate_message(&message, &message_type);
-            events += 1;
-            bytes += message.len();
+
+    if is_gzipped {
+        let reader = StreamReader::new(body.map(|result| result.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))));
+        let decoder = GzipDecoder::new(reader);
+        let decompressed = tokio_util::io::ReaderStream::new(decoder).map(|result| result.map(Bytes::from));
+        let mut stream = StreamBody::new(decompressed);
+        while let Some(msg) = stream.next().await {
+            let mut msg = msg.unwrap().to_vec();
+            while let Some(message) = extract_message(&mut msg) {
+                validate_message(&message, &message_type);
+                events += 1;
+                bytes += message.len();
+            }
+        }
+    } else {
+        while let Some(msg) = body.next().await {
+            let mut msg = msg.unwrap().to_vec();
+            while let Some(message) = extract_message(&mut msg) {
+                validate_message(&message, &message_type);
+                events += 1;
+                bytes += message.len();
+            }
         }
     }
     stats.increment(events, bytes).await;

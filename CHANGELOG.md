@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- gzip decompression based on `Content-Encoding` header for the HTTP absorber
+
 ## [0.3.0](https://github.com/anson-vandoren/protoglot/compare/v0.2.1..v0.3.0) - 2025-04-25
 
 ### Added

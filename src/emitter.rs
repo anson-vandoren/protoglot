@@ -28,8 +28,7 @@ where
 {
     pub async fn run(&mut self) -> tokio::io::Result<()> {
         let start_time = Instant::now();
-        // convert rate (in events per second) to interval (in microseconds)
-        let mut interval = tokio::time::interval(Duration::from_micros(1000000 / self.config.rate));
+        let mut interval = tokio::time::interval(Duration::from_nanos(1_000_000_000 / self.config.rate));
 
         while self.config.num_cycles == 0 || self.cycles_sent < self.config.num_cycles {
             for _ in 0..self.config.events_per_cycle {
