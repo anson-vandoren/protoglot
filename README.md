@@ -2,8 +2,8 @@
 
 # What's it do?
 
-Cribl supports sending to and receiving from a variety of destinations and sources. To facilitate testing,
-it's useful to have a tool that can send and receive data to and from these destinations and sources.
+To facilitate various testing of event pipelining (etc.) tools, it's useful to have a tool that can send and
+receive data to and from various destinations and sources.
 
 # How do I use it?
 
