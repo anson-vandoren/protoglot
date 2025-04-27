@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Drastically improved the performance of emitters at the expense of randomized messages.
+- Fixed HTTP absorber parsing for compressed and uncompressed payloads.
 
 ## [0.3.0](https://github.com/anson-vandoren/protoglot/compare/v0.2.1..v0.3.0) - 2025-04-25
 

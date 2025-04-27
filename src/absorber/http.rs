@@ -136,19 +136,41 @@ async fn handle_request(
         let decoder = GzipDecoder::new(reader);
         let decompressed = tokio_util::io::ReaderStream::new(decoder).map(|result| result.map(Bytes::from));
         let mut stream = StreamBody::new(decompressed);
-        while let Some(msg) = stream.next().await {
-            let mut msg = msg.unwrap().to_vec();
+        let mut msg = Vec::new();
+        while let Some(next_msg) = stream.next().await {
+            msg.extend(next_msg.unwrap().to_vec());
             while let Some(message) = extract_message(&mut msg) {
-                validate_message(&message, &message_type);
+                if !validate_message(&message, &message_type) {
+                    error!(
+                        "Invalid message received. Expected type: {:?}, found {:?}",
+                        message_type,
+                        String::from_utf8_lossy(&message)
+                    );
+                    return Ok(Response::builder()
+                        .status(hyper::StatusCode::BAD_REQUEST)
+                        .body("Invalid message format".to_string())
+                        .unwrap());
+                }
                 events += 1;
                 bytes += message.len();
             }
         }
     } else {
-        while let Some(msg) = body.next().await {
-            let mut msg = msg.unwrap().to_vec();
+        let mut msg = Vec::new();
+        while let Some(next_msg) = body.next().await {
+            msg.extend(next_msg.unwrap().to_vec());
             while let Some(message) = extract_message(&mut msg) {
-                validate_message(&message, &message_type);
+                if !validate_message(&message, &message_type) {
+                    error!(
+                        "Invalid message received. Expected type: {:?}, found {:?}. Discarding payload",
+                        message_type,
+                        String::from_utf8_lossy(&message)
+                    );
+                    return Ok(Response::builder()
+                        .status(hyper::StatusCode::BAD_REQUEST)
+                        .body("Invalid message format".to_string())
+                        .unwrap());
+                }
                 events += 1;
                 bytes += message.len();
             }
