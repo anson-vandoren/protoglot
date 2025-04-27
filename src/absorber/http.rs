@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use async_compression::tokio::bufread::GzipDecoder;
 use bytes::Bytes;
-use flate2::bufread::GzDecoder;
 use http_body_util::{BodyExt, StreamBody};
 use hyper::{
     header::CONTENT_ENCODING,
@@ -12,10 +11,10 @@ use hyper::{
 };
 use hyper_util::rt::TokioIo;
 use log::{debug, error, info};
-use tokio::{io::BufReader, net::TcpListener};
+use tokio::net::TcpListener;
 use tokio_rustls::TlsAcceptor;
 use tokio_stream::{wrappers::TcpListenerStream, StreamExt};
-use tokio_util::io::{ReaderStream, StreamReader};
+use tokio_util::io::StreamReader;
 
 use super::{extract_message, get_cert, validate_message, AbsorberInner, ConnOptions, StatsSvc};
 use crate::config::MessageType;

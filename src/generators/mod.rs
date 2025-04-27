@@ -1,20 +1,12 @@
 mod nd_json;
-mod random_strings;
 mod syslog3164;
 mod syslog5424;
 
-use std::sync::Arc;
-
 pub use nd_json::NdJsonEventGenerator;
-pub use random_strings::RandomStringGenerator;
 pub use syslog3164::Syslog3164EventGenerator;
 pub use syslog5424::Syslog5424EventGenerator;
 
 use crate::config::MessageType;
-
-pub trait Event {
-    fn serialize(&self) -> Vec<u8>;
-}
 
 pub enum EventType {
     Syslog3164(Syslog3164EventGenerator),
@@ -23,22 +15,22 @@ pub enum EventType {
 }
 
 impl EventGenerator for EventType {
-    fn generate(&mut self) -> Box<dyn Event + Send> {
+    fn generate_bytes(&mut self) -> Vec<u8> {
         match self {
-            EventType::Syslog3164(generator) => generator.generate(),
-            EventType::Syslog5424(generator) => generator.generate(),
-            EventType::NdJson(generator) => generator.generate(),
+            EventType::Syslog3164(generator) => generator.generate_bytes(),
+            EventType::Syslog5424(generator) => generator.generate_bytes(),
+            EventType::NdJson(generator) => generator.generate_bytes(),
         }
     }
 }
 pub trait EventGenerator {
-    fn generate(&mut self) -> Box<dyn Event + Send>;
+    fn generate_bytes(&mut self) -> Vec<u8>;
 }
 
-pub fn create_generator(message_type: &MessageType, message_generator: Arc<random_strings::RandomStringGenerator>) -> EventType {
+pub fn create_generator(message_type: &MessageType) -> EventType {
     match message_type {
-        MessageType::Syslog3164 => EventType::Syslog3164(Syslog3164EventGenerator::new(message_generator)),
-        MessageType::Syslog5424 => EventType::Syslog5424(Syslog5424EventGenerator::new(message_generator)),
-        MessageType::NdJson => EventType::NdJson(NdJsonEventGenerator::new(message_generator)),
+        MessageType::Syslog3164 => EventType::Syslog3164(Syslog3164EventGenerator::new()),
+        MessageType::Syslog5424 => EventType::Syslog5424(Syslog5424EventGenerator::new()),
+        MessageType::NdJson => EventType::NdJson(NdJsonEventGenerator::new()),
     }
 }

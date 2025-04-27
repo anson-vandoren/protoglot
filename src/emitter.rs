@@ -28,16 +28,18 @@ where
 {
     pub async fn run(&mut self) -> tokio::io::Result<()> {
         let start_time = Instant::now();
-        let mut interval = tokio::time::interval(Duration::from_nanos(1_000_000_000 / self.config.rate));
+        let mut next_tick = Instant::now();
+        let interval = Duration::from_nanos(1_000_000_000 / self.config.rate);
 
         while self.config.num_cycles == 0 || self.cycles_sent < self.config.num_cycles {
             for _ in 0..self.config.events_per_cycle {
-                interval.tick().await;
-                let event = self.generator.generate();
-                let serialized = event.serialize();
+                let serialized = self.generator.generate_bytes();
                 self.total_bytes += serialized.len() as u64;
                 self.total_events += 1;
                 self.transport.send(serialized).await?;
+
+                next_tick += interval;
+                tokio::time::sleep_until(next_tick.into()).await;
             }
             self.cycles_sent += 1;
 

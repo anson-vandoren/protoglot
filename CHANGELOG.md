@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - gzip decompression based on `Content-Encoding` header for the HTTP absorber
 
+### Changed
+
+- Drastically improved the performance of emitters at the expense of randomized messages.
+
 ## [0.3.0](https://github.com/anson-vandoren/protoglot/compare/v0.2.1..v0.3.0) - 2025-04-25
 
 ### Added
@@ -34,8 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - This changelog.
 
-- `protoglot config` sub-command to write out default config to default config path. 
+- `protoglot config` sub-command to write out default config to default config path.
   Use the `--overwrite true` flag to overwrite an existing config file at that path.
 
-
-[//]: # (Change types: Added, Changed, Deprecated, Removed, Fixed, Security)
+[//]: # 'Change types: Added, Changed, Deprecated, Removed, Fixed, Security'
