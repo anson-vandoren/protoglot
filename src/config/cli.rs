@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use clap::{ArgAction, Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 
-use super::{MessageType, Protocol};
+use super::{absorber::HttpAuth, MessageType, Protocol};
 
 #[derive(Parser, Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -39,7 +39,7 @@ pub struct CliArgs {
     pub protocol: Option<Protocol>,
 
     /// Message type
-    #[arg(short, long)]
+    #[arg(short, long, value_enum)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message_type: Option<MessageType>,
 
@@ -112,6 +112,11 @@ pub enum Commands {
         #[arg(long = "private-ca", action = ArgAction::SetTrue, conflicts_with = "self_signed")]
         #[serde(skip_serializing_if = "Option::is_none")]
         private_ca: Option<bool>,
+
+        /// Auth mechanism for HTTP server
+        #[arg(long, value_enum)]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        auth: Option<HttpAuth>,
     },
 
     /// Write the default config to expected path, if one does not already exist

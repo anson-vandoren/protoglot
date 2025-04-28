@@ -1,7 +1,20 @@
-use log::warn;
+use clap::ValueEnum;
+use log::{info, warn};
 use serde::{Deserialize, Serialize};
 
 use super::{cli::Commands, FullConfig, ListenAddress, MessageType};
+
+#[derive(Default, Serialize, Clone, Deserialize, Debug, Eq, PartialEq, ValueEnum)]
+#[serde(rename_all = "camelCase")]
+pub enum HttpAuth {
+    /// No authentication required
+    #[default]
+    None,
+    /// Basic HTTP authentication (base64 encoded username:password)
+    Basic,
+    /// Bearer token authentication (e.g., JWT)
+    Token,
+}
 
 #[derive(Serialize, Clone, Deserialize, Debug, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -14,6 +27,8 @@ pub struct AbsorberConfig {
     pub https: bool,
     pub self_signed: bool,
     pub private_ca: bool,
+    pub auth: HttpAuth,
+    pub token: String,
 }
 
 #[derive(Serialize, Clone, Default, Deserialize, Debug, Eq, PartialEq)]
@@ -34,6 +49,9 @@ pub struct PartialAbsorberConfig {
     pub self_signed: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub private_ca: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub auth: Option<HttpAuth>,
+    pub token: String,
 }
 
 impl Default for AbsorberConfig {
@@ -46,6 +64,8 @@ impl Default for AbsorberConfig {
             https: false,
             self_signed: false,
             private_ca: false,
+            auth: HttpAuth::None,
+            token: String::new(),
         }
     }
 }
@@ -60,6 +80,8 @@ impl AbsorberConfig {
             https,
             self_signed,
             private_ca,
+            auth,
+            token,
         } = other;
 
         if let Some(listen_addresses) = listen_addresses {
@@ -83,6 +105,11 @@ impl AbsorberConfig {
         if let Some(private_ca) = private_ca {
             self.private_ca = private_ca;
         }
+        if let Some(auth) = auth {
+            self.auth = auth;
+        }
+
+        self.token = token;
 
         self
     }
@@ -97,6 +124,27 @@ impl AbsorberConfig {
     }
 }
 
+const USERNAME: &str = "AzureDiamond";
+const PASSWORD: &str = "hunter2";
+const TOKEN: &str = "this_is_a_fucking_token";
+
+fn token_for(auth: &HttpAuth) -> String {
+    use base64::prelude::*;
+    match auth {
+        HttpAuth::None => String::new(),
+        HttpAuth::Basic => {
+            info!("Using Basic HTTP credentials:\n  Username: {}\n  Password: {}", USERNAME, PASSWORD);
+            let credentials = format!("{}:{}", USERNAME, PASSWORD);
+            let encoded = BASE64_STANDARD.encode(credentials);
+            format!("Basic {}", encoded)
+        }
+        HttpAuth::Token => {
+            info!("Using Token: {}", TOKEN);
+            format!("Bearer {}", TOKEN)
+        }
+    }
+}
+
 impl From<Option<Commands>> for PartialAbsorberConfig {
     fn from(value: Option<Commands>) -> Self {
         if let Some(Commands::Absorber {
@@ -107,6 +155,7 @@ impl From<Option<Commands>> for PartialAbsorberConfig {
             https,
             self_signed,
             private_ca,
+            auth,
         }) = value
         {
             let listen_addresses = listen_addresses
@@ -115,6 +164,7 @@ impl From<Option<Commands>> for PartialAbsorberConfig {
                 .map(|addr| ListenAddress::try_from(addr.as_str()))
                 .collect::<Result<Vec<_>, _>>()
                 .ok();
+            let auth_type = auth.clone().unwrap_or_default();
 
             return Self {
                 update_interval,
@@ -124,6 +174,8 @@ impl From<Option<Commands>> for PartialAbsorberConfig {
                 https,
                 self_signed,
                 private_ca,
+                auth,
+                token: token_for(&auth_type),
             };
         }
         warn!("Tried to get a PartialAbsorberConfig from non-Absorber command: {:?}", value);
@@ -141,6 +193,8 @@ impl From<AbsorberConfig> for PartialAbsorberConfig {
             https: Some(value.https),
             self_signed: Some(value.self_signed),
             private_ca: Some(value.private_ca),
+            auth: Some(value.auth),
+            token: value.token,
         }
     }
 }

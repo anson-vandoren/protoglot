@@ -9,7 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- gzip decompression based on `Content-Encoding` header for the HTTP absorber
+- gzip decompression based on `Content-Encoding` header for the HTTP absorber.
+- Basic and Bearer auth verification for the HTTP absorber.
 
 ### Changed
 

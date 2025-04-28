@@ -46,7 +46,7 @@ async fn handle_tcp_connection(mut socket: TcpStream, stats: &StatsSvc, message_
         match socket.read_buf(&mut buf).await {
             Ok(0) => break, // connection closed
             Ok(_) => {
-                if let Some(message) = extract_message(&mut buf) {
+                if let Some(message) = extract_message(&mut buf, false) {
                     // convert message to string for logging
                     let message_str = String::from_utf8_lossy(&message);
                     trace!("Received message: {:?}", message_str);

@@ -40,6 +40,7 @@ pub struct ConnOptions {
     addr: ListenAddress,
     cert_type: CertType,
     protocol: Protocol,
+    token: String,
 }
 
 impl From<&AbsorberConfig> for Vec<ConnOptions> {
@@ -67,6 +68,7 @@ impl From<&AbsorberConfig> for Vec<ConnOptions> {
                 addr: addr.clone(),
                 cert_type: cert_type.clone(),
                 protocol: addr.protocol.clone(),
+                token: config.token.clone(),
             })
             .collect()
     }
@@ -149,11 +151,14 @@ async fn process_message(message: &[u8], stats: &StatsSvc, message_type: &Messag
     }
 }
 
-pub(super) fn extract_message(buf: &mut Vec<u8>) -> Option<Vec<u8>> {
+pub(super) fn extract_message(buf: &mut Vec<u8>, fin: bool) -> Option<Vec<u8>> {
     // Implement message extraction logic based on the message type
     // For now, assume newline-delimited messages
     if let Some(pos) = buf.iter().position(|&x| x == b'\n') {
         let message = buf.drain(..=pos).collect();
+        Some(message)
+    } else if fin && !buf.is_empty() {
+        let message = buf.drain(..).collect();
         Some(message)
     } else {
         None

@@ -1396,6 +1396,7 @@ version = "0.3.0"
 dependencies = [
  "anyhow",
  "async-compression",
+ "base64",
  "bytes",
  "chrono",
  "clap",
