@@ -123,10 +123,12 @@ async fn handle_request(
     req: Request<hyper::body::Incoming>,
     stats: StatsSvc,
     message_type: MessageType,
-    token: String,
+    token: Option<String>,
 ) -> Result<Response<String>, hyper::Error> {
-    if let Err(err) = check_auth(&req, token) {
-        return Ok(err);
+    if let Some(token) = token {
+        if let Err(err) = check_auth(&req, token) {
+            return Ok(err);
+        }
     }
     let stream = get_decompressed(req);
 
@@ -190,8 +192,12 @@ async fn process_messages(stream: Stream, message_type: MessageType) -> Result<S
     while let Some(next_msg) = stream.next().await {
         match next_msg {
             Ok(data) => {
-                msg.extend(data.to_vec());
-                extract_all(&mut msg, false)?;
+                if !data.is_empty() {
+                    msg.extend(data.to_vec());
+                    extract_all(&mut msg, false)?;
+                } else {
+                    debug!("Empty final message, ignoring.");
+                }
             }
             Err(e) => {
                 error!("Error processing message: {}", e);
@@ -204,7 +210,7 @@ async fn process_messages(stream: Stream, message_type: MessageType) -> Result<S
     }
     // Try for any residual messages in the buffer
     extract_all(&mut msg, true)?;
-    if msg.len() > 0 {
+    if !msg.is_empty() {
         error!("Received message with trailing data: {}", String::from_utf8_lossy(&msg));
         return Err(Response::builder()
             .status(hyper::StatusCode::BAD_REQUEST)
@@ -221,17 +227,17 @@ fn get_decompressed(req: Request<hyper::body::Incoming>) -> Stream {
         .headers()
         .get(CONTENT_ENCODING)
         .map(|value| value.as_bytes())
-        .map_or(false, |enc| enc.eq_ignore_ascii_case(b"gzip"));
+        .is_some_and(|enc| enc.eq_ignore_ascii_case(b"gzip"));
     let body = req.into_body().into_data_stream();
 
     if is_gzipped {
-        let reader = StreamReader::new(body.map(|result| result.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))));
+        let reader = StreamReader::new(body.map(|result| result.map_err(std::io::Error::other)));
         let decoder = GzipDecoder::new(reader);
-        let decompressed = tokio_util::io::ReaderStream::new(decoder)
-            .map(|result| result.map(Bytes::from).map_err(|e| anyhow::anyhow!("Decompression error: {}", e)));
+        let decompressed =
+            tokio_util::io::ReaderStream::new(decoder).map(|result| result.map_err(|e| anyhow::anyhow!("Decompression error: {}", e)));
         Box::new(decompressed)
     } else {
-        Box::new(body.map(|result| result.map_err(|e| anyhow::anyhow!("Body error: {}", e)).map(Bytes::from)))
+        Box::new(body.map(|result| result.map_err(|e| anyhow::anyhow!("Body error: {}", e))))
     }
 }
 
