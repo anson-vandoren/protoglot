@@ -30,7 +30,12 @@ pub trait EventGenerator {
 pub fn create_generator(message_type: &MessageType) -> EventType {
     match message_type {
         MessageType::Syslog3164 => EventType::Syslog3164(Syslog3164EventGenerator::new()),
-        MessageType::Syslog5424 => EventType::Syslog5424(Syslog5424EventGenerator::new()),
+        MessageType::Syslog5424 => {
+            EventType::Syslog5424(Syslog5424EventGenerator::new(false))
+        }
+        MessageType::Syslog5424Octet => {
+            EventType::Syslog5424(Syslog5424EventGenerator::new(true))
+        }
         MessageType::NdJson => EventType::NdJson(NdJsonEventGenerator::new()),
     }
 }

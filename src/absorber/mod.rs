@@ -206,6 +206,7 @@ pub(super) fn validate_message(message: &[u8], typ: &MessageType) -> bool {
     match typ {
         MessageType::Syslog3164 => validate_syslog3164(message),
         MessageType::Syslog5424 => validate_syslog5424(message),
+        MessageType::Syslog5424Octet => validate_syslog5424(message),
         MessageType::NdJson => validate_ndjson(message),
     }
 }

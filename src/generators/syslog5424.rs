@@ -2,11 +2,15 @@ use super::EventGenerator;
 
 pub struct Syslog5424EventGenerator {
     message_index: u64,
+    octet_count_framing: bool,
 }
 
 impl Syslog5424EventGenerator {
-    pub fn new() -> Self {
-        Self { message_index: 0 }
+    pub fn new(octet_count_framing: bool) -> Self {
+        Self {
+            message_index: 0,
+            octet_count_framing,
+        }
     }
 }
 
@@ -47,6 +51,18 @@ impl EventGenerator for Syslog5424EventGenerator {
     fn generate_bytes(&mut self) -> Vec<u8> {
         // add a \n to the end of the message
         self.message_index += 1;
-        MESSAGES[self.message_index as usize % MESSAGES.len()].to_vec()
+        let mut msg = MESSAGES[self.message_index as usize % MESSAGES.len()].to_vec();
+        if self.octet_count_framing {
+            // Remove the trailing newline if present (it is in our const data)
+            if msg.last() == Some(&b'\n') {
+                msg.pop();
+            }
+            let len = msg.len();
+            let mut framed = format!("{} ", len).into_bytes();
+            framed.append(&mut msg);
+            framed
+        } else {
+            msg
+        }
     }
 }

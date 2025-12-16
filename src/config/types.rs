@@ -38,6 +38,7 @@ impl TryFrom<&str> for Protocol {
 pub enum MessageType {
     Syslog3164,
     Syslog5424,
+    Syslog5424Octet,
     NdJson,
 }
 
@@ -48,6 +49,7 @@ impl TryFrom<&str> for MessageType {
         match value {
             "syslog3164" => Ok(Self::Syslog3164),
             "syslog5424" => Ok(Self::Syslog5424),
+            "syslog5424-octet" => Ok(Self::Syslog5424Octet),
             "ndjson" => Ok(Self::NdJson),
             _ => Err(anyhow::anyhow!("Unknown message type '{value}'")),
         }
@@ -59,6 +61,7 @@ impl std::fmt::Display for MessageType {
         let s = match self {
             MessageType::Syslog3164 => "syslog3164",
             MessageType::Syslog5424 => "syslog5424",
+            MessageType::Syslog5424Octet => "syslog5424-octet",
             MessageType::NdJson => "ndjson",
         };
         s.fmt(f)
