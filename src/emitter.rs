@@ -17,8 +17,8 @@ pub struct Emitter<T: Transport, G: EventGenerator> {
     pub generator: G,
     pub config: EmitterConfig,
     cycles_sent: u64,
-    total_events: u64,
-    total_bytes: u64,
+    pub total_events: u64,
+    pub total_bytes: u64,
 }
 
 impl<T, G> Emitter<T, G>

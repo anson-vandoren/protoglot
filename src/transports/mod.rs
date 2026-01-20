@@ -39,7 +39,7 @@ impl fmt::Display for TransportType {
     }
 }
 
-pub async fn create_transport(config: &EmitterConfig) -> tokio::io::Result<TransportType> {
+pub async fn create_transport(config: &EmitterConfig) -> anyhow::Result<TransportType> {
     match config.protocol {
         Protocol::Tcp => {
             if config.tls {
@@ -47,7 +47,7 @@ pub async fn create_transport(config: &EmitterConfig) -> tokio::io::Result<Trans
                     Ok(transport) => Ok(TransportType::TcpTls(transport)),
                     Err(err) => {
                         error!("Failed to create TcpTlsTransport: {}", err);
-                        Err(err)
+                        Err(err.into())
                     }
                 }
             } else {
@@ -64,7 +64,7 @@ pub async fn create_transport(config: &EmitterConfig) -> tokio::io::Result<Trans
             Ok(transport) => Ok(TransportType::Udp(transport)),
             Err(err) => {
                 error!("Failed to create UdpTransport: {}", err);
-                Err(err)
+                Err(err.into())
             }
         },
         Protocol::Http => todo!(),

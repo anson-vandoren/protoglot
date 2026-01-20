@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{cli::Commands, FullConfig, ListenAddress, MessageType};
 
-#[derive(Default, Serialize, Clone, Deserialize, Debug, Eq, PartialEq, ValueEnum)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize, ValueEnum)]
 #[serde(rename_all = "camelCase")]
 pub enum HttpAuth {
     /// No authentication required
@@ -16,7 +16,7 @@ pub enum HttpAuth {
     Token,
 }
 
-#[derive(Serialize, Clone, Deserialize, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AbsorberConfig {
     pub listen_addresses: Vec<ListenAddress>,
@@ -31,7 +31,7 @@ pub struct AbsorberConfig {
     pub token: String,
 }
 
-#[derive(Serialize, Clone, Default, Deserialize, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PartialAbsorberConfig {
     #[serde(skip_serializing_if = "Option::is_none")]

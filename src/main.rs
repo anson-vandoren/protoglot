@@ -15,7 +15,7 @@ use transports::create_transport;
 use crate::{absorber::Absorber, config::AppSettings};
 
 #[tokio::main]
-async fn main() -> tokio::io::Result<()> {
+async fn main() -> anyhow::Result<()> {
     rustls::crypto::ring::default_provider().install_default().unwrap();
     let args = config::cli::CliArgs::parse();
     let config = AppSettings::load(args).unwrap_or_else(|err| {
@@ -47,7 +47,8 @@ async fn main() -> tokio::io::Result<()> {
             handles.spawn(async move {
                 match emitter.run().await {
                     Ok(_) => {
-                        info!(emitter = emitter.transport.to_string(); "Emitter completed successfully")
+                        info!(emitter = emitter.transport.to_string(); "Emitter completed successfully");
+                        info!(total_events = emitter.total_events, total_bytes = emitter.total_bytes; "Totals");
                     }
                     Err(err) => error!("Emitter failed: {}", err),
                 }

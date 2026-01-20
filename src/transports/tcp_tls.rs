@@ -1,5 +1,6 @@
 use std::{fmt, sync::Arc};
 
+use anyhow::Context as _;
 use log::{debug, error};
 use rustls::{pki_types::ServerName, ClientConfig, RootCertStore};
 use tokio::{
@@ -17,7 +18,7 @@ pub struct TcpTlsTransport {
 }
 
 impl TcpTlsTransport {
-    pub async fn new(fqdn: String, port: u16) -> tokio::io::Result<Self> {
+    pub async fn new(fqdn: String, port: u16) -> anyhow::Result<Self> {
         let addr = format!("{}:{}", fqdn, port);
         let domain = ServerName::try_from(fqdn.to_string()).expect("Invalid DNS name");
 
@@ -30,28 +31,33 @@ impl TcpTlsTransport {
 
         let connector = TlsConnector::from(Arc::new(config));
 
-        match TcpStream::connect(&addr).await {
+        let ip = tokio::net::lookup_host(addr)
+            .await?
+            .next()
+            .context("Failed to resolve socket address")?;
+
+        match TcpStream::connect(ip).await {
             Ok(tcp_stream) => {
                 let handshake_duration = Duration::from_secs(5);
                 let handshake_result = time::timeout(handshake_duration, connector.connect(domain, tcp_stream)).await;
                 match handshake_result {
                     Ok(Ok(stream)) => {
-                        debug!("TLS handshake succeeded to {}", addr);
+                        debug!("TLS handshake succeeded to {ip}");
                         Ok(Self { fqdn, port, stream })
                     }
                     Ok(Err(e)) => {
-                        error!("TLS handshake failed to {}: {}", addr, e);
-                        Err(e)
+                        error!("TLS handshake failed to {ip}: {e}");
+                        Err(e.into())
                     }
                     Err(_) => {
-                        error!("TLS handshake timed out to {}", addr);
-                        Err(tokio::io::Error::new(tokio::io::ErrorKind::TimedOut, "TLS handshake timed out"))
+                        error!("TLS handshake timed out to {ip}");
+                        Err(anyhow::anyhow!("TLS handshake timed out"))
                     }
                 }
             }
             Err(e) => {
-                error!("Failed to connect to {}: {}", addr, e);
-                Err(e)
+                error!("Failed to connect to {ip}: {e}");
+                Err(e.into())
             }
         }
     }

@@ -18,7 +18,7 @@ use log::{debug, info, trace};
 use serde::{Deserialize, Serialize};
 pub use types::{MessageType, Protocol};
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AppSettings {
     pub mode: AppMode,
@@ -26,14 +26,14 @@ pub struct AppSettings {
     pub absorber: Option<AbsorberConfig>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub enum AppMode {
     Emitter,
     Absorber,
     Config,
 }
 
-#[derive(Serialize, Clone, Deserialize, Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct FullConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub emitter: Option<PartialEmitterConfig>,

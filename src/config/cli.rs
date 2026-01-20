@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{absorber::HttpAuth, MessageType, Protocol};
 
-#[derive(Parser, Serialize, Deserialize, Debug, Clone)]
+#[derive(Clone, Debug, Deserialize, Parser, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[command(version, about)]
 pub struct CliArgs {
@@ -71,7 +71,7 @@ pub struct CliArgs {
     pub command: Option<Commands>,
 }
 
-#[derive(Subcommand, Serialize, Deserialize, Debug, Clone)]
+#[derive(Clone, Debug, Deserialize, Serialize, Subcommand)]
 #[serde(rename_all = "camelCase")]
 pub enum Commands {
     /// Start an absorber instead
