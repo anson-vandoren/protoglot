@@ -24,9 +24,15 @@ impl UdpTransport {
 }
 
 impl Transport for UdpTransport {
-    async fn send(&mut self, data: Vec<u8>) -> tokio::io::Result<()> {
-        self.socket.send(&data).await?;
-        Ok(())
+    async fn send(&mut self, data: &[u8]) -> tokio::io::Result<()> {
+        match self.socket.try_send(data) {
+            Ok(_) => Ok(()),
+            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                self.socket.send(data).await?;
+                Ok(())
+            }
+            Err(e) => Err(e),
+        }
     }
 }
 

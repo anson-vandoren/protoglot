@@ -15,27 +15,23 @@ pub enum EventType {
 }
 
 impl EventGenerator for EventType {
-    fn generate_bytes(&mut self) -> Vec<u8> {
+    fn generate_into(&mut self, buf: &mut Vec<u8>) {
         match self {
-            EventType::Syslog3164(generator) => generator.generate_bytes(),
-            EventType::Syslog5424(generator) => generator.generate_bytes(),
-            EventType::NdJson(generator) => generator.generate_bytes(),
+            EventType::Syslog3164(generator) => generator.generate_into(buf),
+            EventType::Syslog5424(generator) => generator.generate_into(buf),
+            EventType::NdJson(generator) => generator.generate_into(buf),
         }
     }
 }
 pub trait EventGenerator {
-    fn generate_bytes(&mut self) -> Vec<u8>;
+    fn generate_into(&mut self, buf: &mut Vec<u8>);
 }
 
 pub fn create_generator(message_type: &MessageType) -> EventType {
     match message_type {
         MessageType::Syslog3164 => EventType::Syslog3164(Syslog3164EventGenerator::new()),
-        MessageType::Syslog5424 => {
-            EventType::Syslog5424(Syslog5424EventGenerator::new(false))
-        }
-        MessageType::Syslog5424Octet => {
-            EventType::Syslog5424(Syslog5424EventGenerator::new(true))
-        }
+        MessageType::Syslog5424 => EventType::Syslog5424(Syslog5424EventGenerator::new(false)),
+        MessageType::Syslog5424Octet => EventType::Syslog5424(Syslog5424EventGenerator::new(true)),
         MessageType::NdJson => EventType::NdJson(NdJsonEventGenerator::new()),
     }
 }

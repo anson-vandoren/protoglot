@@ -1,3 +1,5 @@
+use std::io::Write;
+
 use super::EventGenerator;
 
 pub struct Syslog5424EventGenerator {
@@ -48,21 +50,19 @@ b"<105>1 2022-10-17T23:47:54.807139Z sport8024 judgeRover.jar 78361 ZebraValeryS
 ];
 
 impl EventGenerator for Syslog5424EventGenerator {
-    fn generate_bytes(&mut self) -> Vec<u8> {
-        // add a \n to the end of the message
+    fn generate_into(&mut self, buf: &mut Vec<u8>) {
         self.message_index += 1;
-        let mut msg = MESSAGES[self.message_index as usize % MESSAGES.len()].to_vec();
+        let mut msg = MESSAGES[self.message_index as usize % MESSAGES.len()];
         if self.octet_count_framing {
             // Remove the trailing newline if present (it is in our const data)
             if msg.last() == Some(&b'\n') {
-                msg.pop();
+                msg = &msg[..msg.len() - 1];
             }
             let len = msg.len();
-            let mut framed = format!("{} ", len).into_bytes();
-            framed.append(&mut msg);
-            framed
+            write!(buf, "{} ", len).unwrap();
+            buf.extend_from_slice(msg);
         } else {
-            msg
+            buf.extend_from_slice(msg);
         }
     }
 }

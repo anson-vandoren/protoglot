@@ -31,15 +31,31 @@ where
         let mut next_tick = Instant::now();
         let interval = Duration::from_nanos(1_000_000_000 / self.config.rate);
 
+        let mut buf = Vec::with_capacity(1024);
+        let batch_size = if self.config.rate >= 100_000 {
+            128
+        } else if self.config.rate >= 10_000 {
+            64
+        } else if self.config.rate >= 1_000 {
+            16
+        } else if self.config.rate >= 100 {
+            4
+        } else {
+            1
+        };
+
         while self.config.num_cycles == 0 || self.cycles_sent < self.config.num_cycles {
-            for _ in 0..self.config.events_per_cycle {
-                let serialized = self.generator.generate_bytes();
-                self.total_bytes += serialized.len() as u64;
+            for i in 0..self.config.events_per_cycle {
+                buf.clear();
+                self.generator.generate_into(&mut buf);
+                self.total_bytes += buf.len() as u64;
                 self.total_events += 1;
-                self.transport.send(serialized).await?;
+                self.transport.send(&buf).await?;
 
                 next_tick += interval;
-                tokio::time::sleep_until(next_tick.into()).await;
+                if i % batch_size == 0 {
+                    tokio::time::sleep_until(next_tick.into()).await;
+                }
             }
             self.cycles_sent += 1;
 

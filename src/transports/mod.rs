@@ -16,7 +16,7 @@ pub enum TransportType {
 }
 
 impl Transport for TransportType {
-    async fn send(&mut self, data: Vec<u8>) -> tokio::io::Result<()> {
+    async fn send(&mut self, data: &[u8]) -> tokio::io::Result<()> {
         match self {
             TransportType::Tcp(transport) => transport.send(data).await,
             TransportType::TcpTls(transport) => transport.send(data).await,
@@ -26,7 +26,7 @@ impl Transport for TransportType {
 }
 
 pub trait Transport: Send {
-    fn send(&mut self, data: Vec<u8>) -> impl std::future::Future<Output = tokio::io::Result<()>> + Send;
+    fn send(&mut self, data: &[u8]) -> impl std::future::Future<Output = tokio::io::Result<()>> + Send;
 }
 
 impl fmt::Display for TransportType {

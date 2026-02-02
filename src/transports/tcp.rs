@@ -29,8 +29,8 @@ impl TcpTransport {
 }
 
 impl Transport for TcpTransport {
-    async fn send(&mut self, data: Vec<u8>) -> tokio::io::Result<()> {
-        tokio::io::AsyncWriteExt::write_all(&mut self.stream, &data).await
+    async fn send(&mut self, data: &[u8]) -> tokio::io::Result<()> {
+        tokio::io::AsyncWriteExt::write_all(&mut self.stream, data).await
     }
 }
 

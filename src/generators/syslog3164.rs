@@ -24,8 +24,8 @@ impl Syslog3164EventGenerator {
 }
 
 impl EventGenerator for Syslog3164EventGenerator {
-    fn generate_bytes(&mut self) -> Vec<u8> {
+    fn generate_into(&mut self, buf: &mut Vec<u8>) {
         self.message_index += 1;
-        MESSAGES[self.message_index as usize % MESSAGES.len()].to_vec()
+        buf.extend_from_slice(MESSAGES[self.message_index as usize % MESSAGES.len()]);
     }
 }
