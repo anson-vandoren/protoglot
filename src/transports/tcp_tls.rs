@@ -19,7 +19,7 @@ pub struct TcpTlsTransport {
 
 impl TcpTlsTransport {
     pub async fn new(fqdn: String, port: u16) -> anyhow::Result<Self> {
-        let addr = format!("{}:{}", fqdn, port);
+        let addr = (fqdn.as_str(), port);
         let domain = ServerName::try_from(fqdn.to_string()).expect("Invalid DNS name");
 
         let mut root_store = RootCertStore::empty();

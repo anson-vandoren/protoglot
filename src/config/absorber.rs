@@ -163,6 +163,7 @@ impl From<Option<Commands>> for PartialAbsorberConfig {
                 .flatten()
                 .map(|addr| ListenAddress::try_from(addr.as_str()))
                 .collect::<Result<Vec<_>, _>>()
+                .inspect_err(|e| warn!("Failed to parse listen address: {}", e))
                 .ok();
             let auth_type = auth.clone().unwrap_or_default();
 

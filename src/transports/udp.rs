@@ -10,13 +10,12 @@ pub struct UdpTransport {
 
 impl UdpTransport {
     pub async fn new(fqdn: String, port: u16) -> tokio::io::Result<Self> {
-        let addr = format!("{}:{}", fqdn, port);
         let socket = tokio::net::UdpSocket::bind("0.0.0.0:0").await?;
 
-        match socket.connect(&addr).await {
+        match socket.connect((fqdn.as_str(), port)).await {
             Ok(_) => Ok(Self { fqdn, port, socket }),
             Err(e) => {
-                log::error!("Failed to connect to {}: {}", addr, e);
+                log::error!("Failed to connect to {fqdn}:{port}: {e}");
                 Err(e)
             }
         }

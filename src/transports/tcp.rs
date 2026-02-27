@@ -13,7 +13,7 @@ pub struct TcpTransport {
 
 impl TcpTransport {
     pub async fn new(fqdn: String, port: u16) -> anyhow::Result<Self> {
-        let addr = format!("{}:{}", fqdn, port);
+        let addr = (fqdn.as_str(), port);
         let ip = tokio::net::lookup_host(addr)
             .await?
             .next()

@@ -12,7 +12,7 @@ impl UdpAbsorber {
     pub async fn build(opts: ConnOptions, message_type: MessageType) -> Self {
         let address = opts.addr.host;
         let port = opts.addr.port;
-        let listener = UdpSocket::bind(format!("{}:{}", address, port))
+        let listener = UdpSocket::bind((address.as_str(), port))
             .await
             .expect("Could not bind to UDP address & port.");
         Self { listener, message_type }

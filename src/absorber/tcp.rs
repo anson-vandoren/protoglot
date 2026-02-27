@@ -19,7 +19,7 @@ impl TcpAbsorber {
 
     pub(super) async fn run(self, stats: StatsSvc) -> anyhow::Result<()> {
         let ConnOptions { addr, cert_type, .. } = self.opts;
-        let listener = TcpListener::bind(format!("{}:{}", addr.host, addr.port))
+        let listener = TcpListener::bind((addr.host.as_str(), addr.port))
             .await
             .expect("Could not bind to TCP address & port");
 

@@ -77,12 +77,13 @@ impl TryFrom<&str> for ListenAddress {
             return Err(anyhow::anyhow!("Invalid listen address format"));
         }
         let protocol = Protocol::try_from(parts[0])?;
-        let parts: Vec<&str> = parts[1].split(':').collect();
-        if parts.len() != 2 {
-            return Err(anyhow::anyhow!("Invalid listen address format"));
-        }
-        let host = parts[0].to_string();
-        let port = parts[1].parse()?;
+        let (host_part, port_part) = parts[1]
+            .rsplit_once(':')
+            .ok_or_else(|| anyhow::anyhow!("Invalid listen address format"))?;
+
+        let host = host_part.trim_start_matches('[').trim_end_matches(']').to_string();
+        let port = port_part.parse()?;
+
         Ok(Self { host, port, protocol })
     }
 }
