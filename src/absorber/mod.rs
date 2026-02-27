@@ -52,17 +52,6 @@ impl From<&AbsorberConfig> for Vec<ConnOptions> {
             true => hyper::Version::HTTP_2,
             false => hyper::Version::HTTP_11,
         };
-        let cert_type = if config.https || config.http2 {
-            if config.self_signed {
-                CertType::SelfSigned
-            } else if config.private_ca {
-                CertType::PrivateCA
-            } else {
-                CertType::PublicCA
-            }
-        } else {
-            CertType::None
-        };
         let token = match config.auth {
             HttpAuth::None => None,
             _ => Some(config.token.clone()),
@@ -70,12 +59,32 @@ impl From<&AbsorberConfig> for Vec<ConnOptions> {
         config
             .listen_addresses
             .iter()
-            .map(|addr| ConnOptions {
-                http_version,
-                addr: addr.clone(),
-                cert_type: cert_type.clone(),
-                protocol: addr.protocol.clone(),
-                token: token.clone(),
+            .map(|addr| {
+                let addr_tls = match addr.protocol {
+                    Protocol::Https | Protocol::Tcps => true,
+                    _ => false,
+                };
+                let use_tls = config.https || config.http2 || addr_tls;
+
+                let cert_type = if use_tls {
+                    if config.self_signed {
+                        CertType::SelfSigned
+                    } else if config.private_ca {
+                        CertType::PrivateCA
+                    } else {
+                        CertType::PublicCA
+                    }
+                } else {
+                    CertType::None
+                };
+
+                ConnOptions {
+                    http_version,
+                    addr: addr.clone(),
+                    cert_type,
+                    protocol: addr.protocol.clone(),
+                    token: token.clone(),
+                }
             })
             .collect()
     }
@@ -84,9 +93,9 @@ impl From<&AbsorberConfig> for Vec<ConnOptions> {
 impl AbsorberInner {
     async fn build(opts: ConnOptions, message_type: MessageType) -> Self {
         match opts.protocol {
-            Protocol::Tcp => TcpAbsorber::build(opts, message_type).await.into(),
+            Protocol::Tcp | Protocol::Tcps => TcpAbsorber::build(opts, message_type).await.into(),
             Protocol::Udp => UdpAbsorber::build(opts, message_type).await.into(),
-            Protocol::Http => HttpAbsorber::build(opts, message_type).await.into(),
+            Protocol::Http | Protocol::Https => HttpAbsorber::build(opts, message_type).await.into(),
         }
     }
 

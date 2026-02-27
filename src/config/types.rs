@@ -5,16 +5,20 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "lowercase")]
 pub enum Protocol {
     Tcp,
+    Tcps,
     Udp,
     Http,
+    Https,
 }
 
 impl std::fmt::Display for Protocol {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
             Protocol::Tcp => "tcp",
+            Protocol::Tcps => "tcps",
             Protocol::Udp => "udp",
             Protocol::Http => "http",
+            Protocol::Https => "https",
         };
         s.fmt(f)
     }
@@ -26,8 +30,10 @@ impl TryFrom<&str> for Protocol {
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value.to_lowercase().as_str() {
             "tcp" => Ok(Protocol::Tcp),
+            "tcps" => Ok(Protocol::Tcps),
             "udp" => Ok(Protocol::Udp),
             "http" => Ok(Protocol::Http),
+            "https" => Ok(Protocol::Https),
             _ => Err(anyhow::anyhow!("Invalid protocol {value}")),
         }
     }

@@ -41,8 +41,9 @@ impl fmt::Display for TransportType {
 
 pub async fn create_transport(config: &EmitterConfig) -> anyhow::Result<TransportType> {
     match config.protocol {
-        Protocol::Tcp => {
-            if config.tls {
+        Protocol::Tcp | Protocol::Tcps => {
+            let use_tls = config.tls || matches!(config.protocol, Protocol::Tcps);
+            if use_tls {
                 match tcp_tls::TcpTlsTransport::new(config.host.clone(), config.port).await {
                     Ok(transport) => Ok(TransportType::TcpTls(transport)),
                     Err(err) => {
@@ -67,6 +68,6 @@ pub async fn create_transport(config: &EmitterConfig) -> anyhow::Result<Transpor
                 Err(err.into())
             }
         },
-        Protocol::Http => todo!(),
+        Protocol::Http | Protocol::Https => todo!(),
     }
 }
