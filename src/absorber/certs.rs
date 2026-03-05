@@ -17,6 +17,7 @@ use super::CertType;
 pub(super) struct CertKey {
     key_pem: String,
     cert_pem: String,
+    root_cert_pem: Option<String>,
 }
 
 impl CertKey {
@@ -29,6 +30,14 @@ impl CertKey {
     pub fn key(&self) -> PrivateKeyDer<'static> {
         PrivateKeyDer::from_pem_slice(self.key_pem.as_bytes()).expect("Failed to parse key PEM data")
     }
+
+    pub fn root_cert(&self) -> Option<Vec<CertificateDer<'static>>> {
+        self.root_cert_pem.as_ref().map(|pem| {
+            CertificateDer::pem_slice_iter(pem.as_bytes())
+                .collect::<Result<Vec<_>, _>>()
+                .expect("Failed to parse root certificate PEM data")
+        })
+    }
 }
 
 impl From<CertifiedKey> for CertKey {
@@ -36,23 +45,34 @@ impl From<CertifiedKey> for CertKey {
         CertKey {
             key_pem: value.key_pair.serialize_pem(),
             cert_pem: value.cert.pem(),
+            root_cert_pem: None,
         }
     }
 }
 
-pub(super) async fn get_cert(cert_type: &CertType) -> Result<Option<CertKey>> {
+pub(super) async fn get_cert(cert_type: &CertType, mtls: bool) -> Result<Option<CertKey>> {
     match cert_type {
         CertType::None => Ok(None),
-        CertType::SelfSigned => Ok(Some(gen_self_signed()?)),
-        CertType::PublicCA => Ok(Some(pull_public_certs().await?)),
-        CertType::PrivateCA => Ok(Some(gen_private_ca()?)),
+        CertType::SelfSigned => {
+            if mtls {
+                anyhow::bail!("mTLS requires --private-ca, it cannot be used with --self-signed");
+            }
+            Ok(Some(gen_self_signed()?))
+        }
+        CertType::PublicCA => {
+            if mtls {
+                anyhow::bail!("mTLS requires --private-ca, it cannot be used with public certs");
+            }
+            Ok(Some(pull_public_certs().await?))
+        }
+        CertType::PrivateCA => Ok(Some(gen_private_ca(mtls)?)),
     }
 }
 
-fn generate_cert(ca: Option<&CertifiedKey>, is_ca: bool) -> Result<CertifiedKey> {
-    let sans = match is_ca {
-        false => vec!["localhost".to_string(), "local.fucktls.com".to_string()],
-        true => vec![],
+fn generate_cert(ca: Option<&CertifiedKey>, is_ca: bool, is_client: bool) -> Result<CertifiedKey> {
+    let sans = match (is_ca, is_client) {
+        (false, false) => vec!["localhost".to_string(), "local.fucktls.com".to_string()],
+        _ => vec![],
     };
     let mut params = CertificateParams::new(sans)?;
 
@@ -70,7 +90,11 @@ fn generate_cert(ca: Option<&CertifiedKey>, is_ca: bool) -> Result<CertifiedKey>
         params.key_usages.push(KeyUsagePurpose::CrlSign);
     } else {
         params.use_authority_key_identifier_extension = true;
-        params.extended_key_usages.push(ExtendedKeyUsagePurpose::ServerAuth);
+        if is_client {
+            params.extended_key_usages.push(ExtendedKeyUsagePurpose::ClientAuth);
+        } else {
+            params.extended_key_usages.push(ExtendedKeyUsagePurpose::ServerAuth);
+        }
     }
 
     let key_pair = KeyPair::generate()?;
@@ -83,18 +107,22 @@ fn generate_cert(ca: Option<&CertifiedKey>, is_ca: bool) -> Result<CertifiedKey>
 }
 
 fn gen_self_signed() -> Result<CertKey> {
-    let cert_key = generate_cert(None, false)?;
-    save_and_print_certs(&cert_key, None)?;
+    let cert_key = generate_cert(None, false, false)?;
+    save_and_print_certs(&cert_key, None, None)?;
     debug!("Generated self-signed cert");
     Ok(cert_key.into())
 }
 
-fn gen_private_ca() -> Result<CertKey> {
-    let ca = generate_cert(None, true)?;
-    let cert_key = generate_cert(Some(&ca), false)?;
-    save_and_print_certs(&cert_key, Some(&ca))?;
+fn gen_private_ca(mtls: bool) -> Result<CertKey> {
+    let ca = generate_cert(None, true, false)?;
+    let cert_key = generate_cert(Some(&ca), false, false)?;
+    let client_cert = if mtls { Some(generate_cert(Some(&ca), false, true)?) } else { None };
+    save_and_print_certs(&cert_key, Some(&ca), client_cert.as_ref())?;
     debug!("Generated private CA & server cert");
-    Ok(cert_key.into())
+
+    let mut key: CertKey = cert_key.into();
+    key.root_cert_pem = Some(ca.cert.pem());
+    Ok(key)
 }
 
 async fn pull_public_certs() -> Result<CertKey> {
@@ -131,7 +159,11 @@ async fn pull_public_certs() -> Result<CertKey> {
         }
     }
 
-    Ok(CertKey { cert_pem, key_pem })
+    Ok(CertKey {
+        cert_pem,
+        key_pem,
+        root_cert_pem: None,
+    })
 }
 
 fn validity_interval() -> (SystemTime, SystemTime) {
@@ -146,7 +178,7 @@ fn validity_interval() -> (SystemTime, SystemTime) {
 
 const DEFAULT_CERT_PATH: &str = "/tmp/protoglot";
 
-fn save_and_print_certs(cert_key: &CertifiedKey, ca_cert: Option<&CertifiedKey>) -> Result<()> {
+fn save_and_print_certs(cert_key: &CertifiedKey, ca_cert: Option<&CertifiedKey>, client_cert_key: Option<&CertifiedKey>) -> Result<()> {
     let base_path = PathBuf::from(DEFAULT_CERT_PATH);
     std::fs::create_dir_all(&base_path)?;
 
@@ -157,9 +189,22 @@ fn save_and_print_certs(cert_key: &CertifiedKey, ca_cert: Option<&CertifiedKey>)
 
     if let Some(ca_cert) = ca_cert {
         let ca_path = base_path.join("ca_cert.pem");
-        let ca_cert = ca_cert.cert.pem();
-        println!("Writing CA cert to: {}\n\n{}", ca_path.display(), ca_cert);
-        std::fs::write(ca_path, ca_cert)?;
+        let ca_cert_pem = ca_cert.cert.pem();
+        println!("Writing CA cert to: {}\n\n{}", ca_path.display(), ca_cert_pem);
+        std::fs::write(ca_path, ca_cert_pem)?;
     }
+
+    if let Some(client_cert_key) = client_cert_key {
+        let client_cert_path = base_path.join("client_cert.pem");
+        let client_cert = client_cert_key.cert.pem();
+        println!("Writing client cert to: {}\n\n{}", client_cert_path.display(), client_cert);
+        std::fs::write(client_cert_path, client_cert)?;
+
+        let client_key_path = base_path.join("client_key.pem");
+        let client_key = client_cert_key.key_pair.serialize_pem();
+        println!("Writing client key to: {}\n\n{}", client_key_path.display(), client_key);
+        std::fs::write(client_key_path, client_key)?;
+    }
+
     Ok(())
 }

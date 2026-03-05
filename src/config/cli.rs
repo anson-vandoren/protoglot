@@ -113,6 +113,11 @@ pub enum Commands {
         #[serde(skip_serializing_if = "Option::is_none")]
         private_ca: Option<bool>,
 
+        /// Require client certificates signed by the internal CA. Only valid when using --private-ca
+        #[arg(long = "mtls", action = ArgAction::SetTrue)]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        mtls: Option<bool>,
+
         /// Auth mechanism for HTTP server
         #[arg(long, value_enum)]
         #[serde(skip_serializing_if = "Option::is_none")]

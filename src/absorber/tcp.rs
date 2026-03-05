@@ -23,12 +23,29 @@ impl TcpAbsorber {
             .await
             .expect("Could not bind to TCP address & port");
 
-        let cert_key = get_cert(&cert_type).await?;
+        let cert_key = get_cert(&cert_type, self.opts.mtls).await?;
         let acceptor = if let Some(cert_key) = cert_key {
             let key = cert_key.key();
-            let config = rustls::ServerConfig::builder()
-                .with_no_client_auth()
-                .with_single_cert(cert_key.cert(), key)?;
+            let builder = rustls::ServerConfig::builder();
+
+            let builder = if self.opts.mtls {
+                if let Some(roots) = cert_key.root_cert() {
+                    let mut store = rustls::RootCertStore::empty();
+                    for root in roots {
+                        store.add(root).expect("Failed to add root cert");
+                    }
+                    let verifier = rustls::server::WebPkiClientVerifier::builder(Arc::new(store))
+                        .build()
+                        .expect("Failed to build client verifier");
+                    builder.with_client_cert_verifier(verifier)
+                } else {
+                    panic!("mTLS enabled but no root cert available");
+                }
+            } else {
+                builder.with_no_client_auth()
+            };
+
+            let config = builder.with_single_cert(cert_key.cert(), key)?;
             Some(TlsAcceptor::from(Arc::new(config)))
         } else {
             None
@@ -66,28 +83,69 @@ impl TcpAbsorber {
     }
 }
 async fn handle_tcp_connection(
-    mut socket: impl tokio::io::AsyncRead + Unpin,
+    socket: impl tokio::io::AsyncRead + Unpin + Send + 'static,
     stats: &StatsSvc,
     message_type: &MessageType,
 ) -> tokio::io::Result<()> {
+    use tokio::io::AsyncBufReadExt as _;
+    let mut reader = tokio::io::BufReader::new(socket);
+
+    // Peek for gzip magic bytes (0x1f 0x8b)
+    let is_gzip = match reader.fill_buf().await {
+        Ok(buf) => buf.len() >= 2 && buf[0] == 0x1f && buf[1] == 0x8b,
+        Err(e) => {
+            error!("Error peeking into socket: {}", e);
+            return Err(e);
+        }
+    };
+
     let mut buf = Vec::new();
-    loop {
-        match socket.read_buf(&mut buf).await {
-            Ok(0) => break, // connection closed
-            Ok(_) => {
-                if let Some(message) = extract_message(&mut buf, false) {
-                    // convert message to string for logging
-                    let message_str = String::from_utf8_lossy(&message);
-                    trace!("Received message: {:?}", message_str);
-                    process_message(&message, stats, message_type).await;
+    if is_gzip {
+        debug!("Detected gzipped stream, decompressing...");
+        let mut decoder = async_compression::tokio::bufread::GzipDecoder::new(reader);
+        // We might need to handle multiple members, but for now let's ensure we read to the end of the DECODER
+        loop {
+            match decoder.read_buf(&mut buf).await {
+                Ok(0) => break,
+                Ok(_) => {
+                    while let Some(message) = extract_message(&mut buf, false) {
+                        trace!("Received gzipped message: {:?}", String::from_utf8_lossy(&message));
+                        process_message(&message, stats, message_type).await;
+                    }
+                }
+                Err(e) => {
+                    error!("Decompression error: {}", e);
+                    return Err(e);
                 }
             }
-            Err(err) => {
-                eprintln!("Error reading from socket: {}", err);
-                break;
+        }
+        // Final check for remaining messages in the buffer after decoder EOF
+        if let Some(message) = extract_message(&mut buf, true) {
+            process_message(&message, stats, message_type).await;
+        }
+    } else {
+        loop {
+            match reader.read_buf(&mut buf).await {
+                Ok(0) => break,
+                Ok(_) => {
+                    while let Some(message) = extract_message(&mut buf, false) {
+                        trace!("Received message: {:?}", String::from_utf8_lossy(&message));
+                        process_message(&message, stats, message_type).await;
+                    }
+                }
+                Err(e) => {
+                    error!("Read error: {}", e);
+                    return Err(e);
+                }
             }
         }
+        // Final check for remaining messages in the buffer after reader EOF
+        if let Some(message) = extract_message(&mut buf, true) {
+            process_message(&message, stats, message_type).await;
+        }
     }
+
+    debug!("Connection closed normally");
     Ok(())
 }
 

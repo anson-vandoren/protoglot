@@ -35,18 +35,35 @@ impl HttpAbsorber {
         let listener = TcpListener::bind((addr.host, addr.port))
             .await
             .expect("Could not bind to TCP address & port");
-        let cert_key = get_cert(&cert_type).await?;
+        let cert_key = get_cert(&cert_type, self.opts.mtls).await?;
         let acceptor = if let Some(cert_key) = cert_key {
             let key = cert_key.key();
-            let mut config = rustls::ServerConfig::builder()
-                .with_no_client_auth()
-                .with_single_cert(cert_key.cert(), key)?;
+            let builder = rustls::ServerConfig::builder();
+
+            let builder = if self.opts.mtls {
+                if let Some(roots) = cert_key.root_cert() {
+                    let mut store = rustls::RootCertStore::empty();
+                    for root in roots {
+                        store.add(root).expect("Failed to add root cert");
+                    }
+                    let verifier = rustls::server::WebPkiClientVerifier::builder(Arc::new(store))
+                        .build()
+                        .expect("Failed to build client verifier");
+                    builder.with_client_cert_verifier(verifier)
+                } else {
+                    panic!("mTLS enabled but no root cert available");
+                }
+            } else {
+                builder.with_no_client_auth()
+            };
+
+            let mut config = builder.with_single_cert(cert_key.cert(), key)?;
             if self.opts.http_version == hyper::Version::HTTP_2 {
                 config.alpn_protocols = vec!["h2".into()];
             } else {
                 config.alpn_protocols = vec!["http/1.1".into()];
             }
-            //config.alpn_protocols = vec!["h2".into(), "http/1.1".into()];
+            // config.alpn_protocols = vec!["h2".into(), "http/1.1".into()];
             Some(TlsAcceptor::from(Arc::new(config)))
         } else {
             None

@@ -44,6 +44,7 @@ pub struct ConnOptions {
     cert_type: CertType,
     protocol: Protocol,
     token: Option<String>,
+    mtls: bool,
 }
 
 impl From<&AbsorberConfig> for Vec<ConnOptions> {
@@ -84,6 +85,7 @@ impl From<&AbsorberConfig> for Vec<ConnOptions> {
                     cert_type,
                     protocol: addr.protocol.clone(),
                     token: token.clone(),
+                    mtls: config.mtls,
                 }
             })
             .collect()

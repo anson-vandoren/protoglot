@@ -27,6 +27,7 @@ pub struct AbsorberConfig {
     pub https: bool,
     pub self_signed: bool,
     pub private_ca: bool,
+    pub mtls: bool,
     pub auth: HttpAuth,
     pub token: String,
 }
@@ -50,6 +51,8 @@ pub struct PartialAbsorberConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub private_ca: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub mtls: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub auth: Option<HttpAuth>,
     pub token: String,
 }
@@ -64,6 +67,7 @@ impl Default for AbsorberConfig {
             https: false,
             self_signed: false,
             private_ca: false,
+            mtls: false,
             auth: HttpAuth::None,
             token: String::new(),
         }
@@ -80,6 +84,7 @@ impl AbsorberConfig {
             https,
             self_signed,
             private_ca,
+            mtls,
             auth,
             token,
         } = other;
@@ -104,6 +109,9 @@ impl AbsorberConfig {
         }
         if let Some(private_ca) = private_ca {
             self.private_ca = private_ca;
+        }
+        if let Some(mtls) = mtls {
+            self.mtls = mtls;
         }
         if let Some(auth) = auth {
             self.auth = auth;
@@ -155,6 +163,7 @@ impl From<Option<Commands>> for PartialAbsorberConfig {
             https,
             self_signed,
             private_ca,
+            mtls,
             auth,
         }) = value
         {
@@ -175,6 +184,7 @@ impl From<Option<Commands>> for PartialAbsorberConfig {
                 https,
                 self_signed,
                 private_ca,
+                mtls,
                 auth,
                 token: token_for(&auth_type),
             };
@@ -194,6 +204,7 @@ impl From<AbsorberConfig> for PartialAbsorberConfig {
             https: Some(value.https),
             self_signed: Some(value.self_signed),
             private_ca: Some(value.private_ca),
+            mtls: Some(value.mtls),
             auth: Some(value.auth),
             token: value.token,
         }
