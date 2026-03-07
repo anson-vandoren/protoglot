@@ -147,13 +147,13 @@ async fn handle_request(
             return Ok(err);
         }
     }
-    let stream = get_decompressed(req);
+    let stream = get_decompressed(req, stats.clone());
 
     let StatsUpdate { events, bytes } = match process_messages(stream, message_type).await {
         Ok(stats) => stats,
         Err(err) => return Ok(err),
     };
-    stats.increment(events, bytes).await;
+    stats.increment(events, 0, bytes).await;
 
     Ok(Response::new("OK".to_string()))
 }
@@ -239,13 +239,20 @@ async fn process_messages(stream: Stream, message_type: MessageType) -> Result<S
 }
 
 type Stream = Box<dyn tokio_stream::Stream<Item = anyhow::Result<Bytes>> + Unpin + Send>;
-fn get_decompressed(req: Request<hyper::body::Incoming>) -> Stream {
+fn get_decompressed(req: Request<hyper::body::Incoming>, stats: StatsSvc) -> Stream {
     let is_gzipped = req
         .headers()
         .get(CONTENT_ENCODING)
         .map(|value| value.as_bytes())
         .is_some_and(|enc| enc.eq_ignore_ascii_case(b"gzip"));
     let body = req.into_body().into_data_stream();
+
+    let body = body.map(move |result| {
+        if let Ok(data) = &result {
+            stats.try_increment(0, data.len(), 0);
+        }
+        result
+    });
 
     if is_gzipped {
         let reader = StreamReader::new(body.map(|result| result.map_err(std::io::Error::other)));

@@ -1,10 +1,14 @@
 use std::sync::Arc;
 
+use async_compression::tokio::bufread::GzipDecoder;
 use log::{debug, error, info, trace};
-use tokio::{io::AsyncReadExt as _, net::TcpListener};
+use tokio::{
+    io::{AsyncReadExt as _, BufReader},
+    net::TcpListener,
+};
 use tokio_rustls::TlsAcceptor;
 
-use super::{extract_message, get_cert, AbsorberInner, ConnOptions, StatsSvc};
+use super::{AbsorberInner, ConnOptions, CountingReader, StatsSvc, extract_message, get_cert};
 use crate::{absorber::process_message, config::MessageType};
 
 pub struct TcpAbsorber {
@@ -82,13 +86,14 @@ impl TcpAbsorber {
         }
     }
 }
-async fn handle_tcp_connection(
+pub(crate) async fn handle_tcp_connection(
     socket: impl tokio::io::AsyncRead + Unpin + Send + 'static,
     stats: &StatsSvc,
     message_type: &MessageType,
 ) -> tokio::io::Result<()> {
     use tokio::io::AsyncBufReadExt as _;
-    let mut reader = tokio::io::BufReader::new(socket);
+    let counting_reader = CountingReader::new(socket, stats.clone());
+    let mut reader = BufReader::new(counting_reader);
 
     // Peek for gzip magic bytes (0x1f 0x8b)
     let is_gzip = match reader.fill_buf().await {
@@ -102,7 +107,7 @@ async fn handle_tcp_connection(
     let mut buf = Vec::new();
     if is_gzip {
         debug!("Detected gzipped stream, decompressing...");
-        let mut decoder = async_compression::tokio::bufread::GzipDecoder::new(reader);
+        let mut decoder = GzipDecoder::new(reader);
         // We might need to handle multiple members, but for now let's ensure we read to the end of the DECODER
         loop {
             match decoder.read_buf(&mut buf).await {

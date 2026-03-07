@@ -23,6 +23,7 @@ impl UdpAbsorber {
         loop {
             let (len, _) = self.listener.recv_from(&mut buf).await?;
             let message = &buf[..len];
+            stats.increment(0, len, 0).await;
             process_message(message, &stats.clone(), &self.message_type).await;
         }
     }

@@ -4,13 +4,22 @@ mod stats_svc;
 mod tcp;
 mod udp;
 
-use std::{ops::Deref, sync::Arc};
+#[cfg(test)]
+mod integration_tests;
+
+use std::{
+    ops::Deref,
+    pin::Pin,
+    sync::Arc,
+    task::{Context, Poll},
+};
 
 use certs::get_cert;
 use http::HttpAbsorber;
 use log::warn;
 use stats_svc::StatsSvc;
 use tcp::TcpAbsorber;
+use tokio::io::{AsyncRead, ReadBuf};
 use udp::UdpAbsorber;
 
 use crate::config::{
@@ -160,12 +169,21 @@ async fn handle_user_input(stats: StatsSvc) -> anyhow::Result<()> {
 }
 
 async fn process_message(message: &[u8], stats: &StatsSvc, message_type: &MessageType) {
+    // Ignore whitespace-only messages (e.g., trailing newlines)
+    if message.iter().all(|b| b.is_ascii_whitespace()) {
+        return;
+    }
+
     // Validate and process the message
     if validate_message(message, message_type) {
         let message_len = message.len();
-        stats.increment(1, message_len).await;
+        stats.increment(1, 0, message_len).await;
     } else {
-        warn!("Failed to validate message");
+        warn!(
+            "Failed to validate message of type {:?}: {:?}",
+            message_type,
+            String::from_utf8_lossy(message)
+        );
     }
 }
 
@@ -219,5 +237,31 @@ pub(super) fn validate_message(message: &[u8], typ: &MessageType) -> bool {
         MessageType::Syslog5424 => validate_syslog5424(message),
         MessageType::Syslog5424Octet => validate_syslog5424(message),
         MessageType::NdJson => validate_ndjson(message),
+    }
+}
+
+pub(super) struct CountingReader<R> {
+    inner: R,
+    stats: StatsSvc,
+}
+
+impl<R> CountingReader<R> {
+    pub(super) fn new(inner: R, stats: StatsSvc) -> Self {
+        Self { inner, stats }
+    }
+}
+
+impl<R: AsyncRead + Unpin> AsyncRead for CountingReader<R> {
+    fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<std::io::Result<()>> {
+        let before = buf.filled().len();
+        let res = Pin::new(&mut self.inner).poll_read(cx, buf);
+        if let Poll::Ready(Ok(())) = &res {
+            let after = buf.filled().len();
+            let n = after - before;
+            if n > 0 {
+                self.stats.try_increment(0, n, 0);
+            }
+        }
+        res
     }
 }

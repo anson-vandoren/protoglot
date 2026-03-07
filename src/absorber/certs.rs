@@ -9,7 +9,7 @@ use flate2::bufread::GzDecoder;
 use log::{debug, trace};
 use rcgen::{BasicConstraints, CertificateParams, CertifiedKey, ExtendedKeyUsagePurpose, IsCa, KeyPair, KeyUsagePurpose};
 use reqwest::Client;
-use rustls::pki_types::{pem::PemObject as _, CertificateDer, PrivateKeyDer};
+use rustls::pki_types::{CertificateDer, PrivateKeyDer, pem::PemObject as _};
 use tar::Archive;
 
 use super::CertType;
