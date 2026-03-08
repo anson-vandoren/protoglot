@@ -149,23 +149,41 @@ impl Absorber {
 }
 
 async fn handle_user_input(stats: StatsSvc) -> anyhow::Result<()> {
-    let mut input = String::new();
     loop {
-        if std::io::stdin().read_line(&mut input).is_ok() {
-            match input.trim() {
-                "rs" => {
-                    stats.reset().await;
-                    println!("Stats reset")
-                }
-                "q" => {
-                    println!("Exiting...");
-                    std::process::exit(0);
-                }
-                _ => {}
+        let stats = stats.clone();
+        let input = tokio::task::spawn_blocking(|| {
+            let mut input = String::new();
+            if std::io::stdin().read_line(&mut input).is_ok() {
+                Some(input)
+            } else {
+                None
             }
+        })
+        .await?;
+
+        match input {
+            Some(input) => {
+                let trimmed = input.trim();
+                if trimmed.is_empty() && input.len() == 0 {
+                    // EOF
+                    break;
+                }
+                match trimmed {
+                    "rs" => {
+                        stats.reset().await;
+                        println!("Stats reset")
+                    }
+                    "q" => {
+                        println!("Exiting...");
+                        std::process::exit(0);
+                    }
+                    _ => {}
+                }
+            }
+            None => break,
         }
-        input.clear();
     }
+    Ok(())
 }
 
 async fn process_message(message: &[u8], stats: &StatsSvc, message_type: &MessageType) {

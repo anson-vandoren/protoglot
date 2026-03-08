@@ -10,7 +10,7 @@ license = "MIT"
 
 [dependencies]
 anyhow = "1.0.102"
-async-compression = { version = "0.4.41", features = ["gzip", "tokio"] }
+async-compression = { version = "0.4.41", features = ["gzip", "tokio", "brotli", "zstd", "lz4"] }
 base64 = "0.22.1"
 bytes = "1.11.1"
 clap = { version = "4.5.60", features = ["derive"] }
@@ -32,12 +32,15 @@ rustls-native-certs = "0.8.3"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_json5 = "0.2.1"
+snap = "1.1.1"
 tar = "0.4.44"
 tokio = { version = "1.50.0", features = ["full"] }
 tokio-rustls = "0.26.4"
+tokio-snappy = "0.2.0"
 tokio-stream = { version = "0.1.18", features = ["net"] }
 tokio-util = "0.7.18"
 
 [dev-dependencies]
 pretty_assertions = { version = "1.4.1", features = ["unstable"] }
 sealed_test = "1.1.0"
+test-log = "0.2.19"

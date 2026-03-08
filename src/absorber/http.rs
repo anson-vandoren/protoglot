@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use async_compression::tokio::bufread::GzipDecoder;
+use async_compression::tokio::bufread::{BrotliDecoder, GzipDecoder, Lz4Decoder, ZstdDecoder};
 use bytes::Bytes;
 use http_body_util::BodyExt;
 use hyper::{
@@ -240,11 +240,12 @@ async fn process_messages(stream: Stream, message_type: MessageType) -> Result<S
 
 type Stream = Box<dyn tokio_stream::Stream<Item = anyhow::Result<Bytes>> + Unpin + Send>;
 fn get_decompressed(req: Request<hyper::body::Incoming>, stats: StatsSvc) -> Stream {
-    let is_gzipped = req
+    let encoding = req
         .headers()
         .get(CONTENT_ENCODING)
-        .map(|value| value.as_bytes())
-        .is_some_and(|enc| enc.eq_ignore_ascii_case(b"gzip"));
+        .and_then(|value| value.to_str().ok())
+        .map(|s| s.to_lowercase());
+
     let body = req.into_body().into_data_stream();
 
     let body = body.map(move |result| {
@@ -254,14 +255,43 @@ fn get_decompressed(req: Request<hyper::body::Incoming>, stats: StatsSvc) -> Str
         result
     });
 
-    if is_gzipped {
-        let reader = StreamReader::new(body.map(|result| result.map_err(std::io::Error::other)));
-        let decoder = GzipDecoder::new(reader);
-        let decompressed =
-            tokio_util::io::ReaderStream::new(decoder).map(|result| result.map_err(|e| anyhow::anyhow!("Decompression error: {}", e)));
-        Box::new(decompressed)
-    } else {
-        Box::new(body.map(|result| result.map_err(|e| anyhow::anyhow!("Body error: {}", e))))
+    match encoding.as_deref() {
+        Some("gzip") => {
+            let reader = StreamReader::new(body.map(|result| result.map_err(std::io::Error::other)));
+            let decoder = GzipDecoder::new(reader);
+            let decompressed = tokio_util::io::ReaderStream::new(decoder)
+                .map(|result| result.map_err(|e| anyhow::anyhow!("Gzip decompression error: {}", e)));
+            Box::new(decompressed)
+        }
+        Some("zstd") => {
+            let reader = StreamReader::new(body.map(|result| result.map_err(std::io::Error::other)));
+            let decoder = ZstdDecoder::new(reader);
+            let decompressed = tokio_util::io::ReaderStream::new(decoder)
+                .map(|result| result.map_err(|e| anyhow::anyhow!("Zstd decompression error: {}", e)));
+            Box::new(decompressed)
+        }
+        Some("lz4") => {
+            let reader = StreamReader::new(body.map(|result| result.map_err(std::io::Error::other)));
+            let decoder = Lz4Decoder::new(reader);
+            let decompressed = tokio_util::io::ReaderStream::new(decoder)
+                .map(|result| result.map_err(|e| anyhow::anyhow!("LZ4 decompression error: {}", e)));
+            Box::new(decompressed)
+        }
+        Some("br") => {
+            let reader = StreamReader::new(body.map(|result| result.map_err(std::io::Error::other)));
+            let decoder = BrotliDecoder::new(reader);
+            let decompressed = tokio_util::io::ReaderStream::new(decoder)
+                .map(|result| result.map_err(|e| anyhow::anyhow!("Brotli decompression error: {}", e)));
+            Box::new(decompressed)
+        }
+        Some("snappy") | Some("x-snappy") => {
+            let reader = StreamReader::new(body.map(|result| result.map_err(std::io::Error::other)));
+            let decoder = tokio_snappy::SnappyIO::new(reader);
+            let decompressed = tokio_util::io::ReaderStream::new(decoder)
+                .map(|result| result.map_err(|e| anyhow::anyhow!("Snappy decompression error: {}", e)));
+            Box::new(decompressed)
+        }
+        _ => Box::new(body.map(|result| result.map_err(|e| anyhow::anyhow!("Body error: {}", e)))),
     }
 }
 

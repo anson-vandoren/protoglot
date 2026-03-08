@@ -1,12 +1,13 @@
 use std::sync::Arc;
 
-use async_compression::tokio::bufread::GzipDecoder;
+use async_compression::tokio::bufread::{GzipDecoder, Lz4Decoder, ZstdDecoder};
 use log::{debug, error, info, trace};
 use tokio::{
-    io::{AsyncReadExt as _, BufReader},
+    io::{AsyncRead, AsyncReadExt as _, BufReader},
     net::TcpListener,
 };
 use tokio_rustls::TlsAcceptor;
+use tokio_snappy::SnappyIO;
 
 use super::{AbsorberInner, ConnOptions, CountingReader, StatsSvc, extract_message, get_cert};
 use crate::{absorber::process_message, config::MessageType};
@@ -95,40 +96,46 @@ pub(crate) async fn handle_tcp_connection(
     let counting_reader = CountingReader::new(socket, stats.clone());
     let mut reader = BufReader::new(counting_reader);
 
-    // Peek for gzip magic bytes (0x1f 0x8b)
-    let is_gzip = match reader.fill_buf().await {
-        Ok(buf) => buf.len() >= 2 && buf[0] == 0x1f && buf[1] == 0x8b,
+    // Peek for magic bytes to detect compression
+    // Gzip: 1f 8b
+    // Zstd: 28 b5 2f fd
+    // LZ4: 04 22 4d 18
+    // Snappy: ff 06 00 00 73 4e 61 50 70 59
+    let (is_gzip, is_zstd, is_lz4, is_snappy) = match reader.fill_buf().await {
+        Ok(buf) => {
+            let first_ten = buf.get(0..10);
+            trace!("First bytes: {first_ten:?}");
+            let is_gzip = buf.len() >= 2 && buf[0] == 0x1f && buf[1] == 0x8b;
+            let is_zstd = buf.len() >= 4 && buf[0] == 0x28 && buf[1] == 0xb5 && buf[2] == 0x2f && buf[3] == 0xfd;
+            let is_lz4 = buf.len() >= 4 && buf[0] == 0x04 && buf[1] == 0x22 && buf[2] == 0x4d && buf[3] == 0x18;
+            let is_snappy =
+                buf.len() >= 10 && buf[0] == 0xff && buf[1] == 0x06 && buf[2] == 0x00 && buf[3] == 0x00 && &buf[4..10] == b"sNaPpY";
+            (is_gzip, is_zstd, is_lz4, is_snappy)
+        }
         Err(e) => {
             error!("Error peeking into socket: {}", e);
             return Err(e);
         }
     };
 
-    let mut buf = Vec::new();
     if is_gzip {
         debug!("Detected gzipped stream, decompressing...");
-        let mut decoder = GzipDecoder::new(reader);
-        // We might need to handle multiple members, but for now let's ensure we read to the end of the DECODER
-        loop {
-            match decoder.read_buf(&mut buf).await {
-                Ok(0) => break,
-                Ok(_) => {
-                    while let Some(message) = extract_message(&mut buf, false) {
-                        trace!("Received gzipped message: {:?}", String::from_utf8_lossy(&message));
-                        process_message(&message, stats, message_type).await;
-                    }
-                }
-                Err(e) => {
-                    error!("Decompression error: {}", e);
-                    return Err(e);
-                }
-            }
-        }
-        // Final check for remaining messages in the buffer after decoder EOF
-        if let Some(message) = extract_message(&mut buf, true) {
-            process_message(&message, stats, message_type).await;
-        }
+        let decoder = GzipDecoder::new(reader);
+        process_decompressed_stream(decoder, stats, message_type).await?;
+    } else if is_zstd {
+        debug!("Detected zstd stream, decompressing...");
+        let decoder = ZstdDecoder::new(reader);
+        process_decompressed_stream(decoder, stats, message_type).await?;
+    } else if is_lz4 {
+        debug!("Detected lz4 stream, decompressing...");
+        let decoder = Lz4Decoder::new(reader);
+        process_decompressed_stream(decoder, stats, message_type).await?;
+    } else if is_snappy {
+        debug!("Detected snappy stream, decompressing...");
+        let decoder = SnappyIO::new(reader);
+        process_decompressed_stream(decoder, stats, message_type).await?;
     } else {
+        let mut buf = Vec::new();
         loop {
             match reader.read_buf(&mut buf).await {
                 Ok(0) => break,
@@ -151,6 +158,34 @@ pub(crate) async fn handle_tcp_connection(
     }
 
     debug!("Connection closed normally");
+    Ok(())
+}
+
+async fn process_decompressed_stream(
+    mut decoder: impl AsyncRead + Unpin,
+    stats: &StatsSvc,
+    message_type: &MessageType,
+) -> tokio::io::Result<()> {
+    let mut buf = Vec::new();
+    loop {
+        match decoder.read_buf(&mut buf).await {
+            Ok(0) => break,
+            Ok(_) => {
+                while let Some(message) = extract_message(&mut buf, false) {
+                    trace!("Received decompressed message: {:?}", String::from_utf8_lossy(&message));
+                    process_message(&message, stats, message_type).await;
+                }
+            }
+            Err(e) => {
+                error!("Decompression error: {}", e);
+                return Err(e);
+            }
+        }
+    }
+    // Final check for remaining messages in the buffer after decoder EOF
+    if let Some(message) = extract_message(&mut buf, true) {
+        process_message(&message, stats, message_type).await;
+    }
     Ok(())
 }
 
