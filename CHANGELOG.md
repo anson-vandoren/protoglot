@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - gzip decompression based on `Content-Encoding` header for the HTTP absorber.
 - Basic and Bearer auth verification for the HTTP absorber.
 - Splunk HEC-formatted emitter payloads over HTTP with batched events and configurable HEC tokens.
+- Built-in emitter profiles and config template output for common local test workflows.
 
 ### Changed
 

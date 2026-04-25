@@ -40,12 +40,36 @@ impl TryFrom<&str> for Protocol {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ValueEnum)]
+#[serde(rename_all = "kebab-case")]
+pub enum Profile {
+    SplunkHec,
+    TcpSyslog3164,
+    TcpSyslog5424,
+    UdpSyslog3164,
+    HttpNdjson,
+}
+
+impl std::fmt::Display for Profile {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            Profile::SplunkHec => "splunk-hec",
+            Profile::TcpSyslog3164 => "tcp-syslog3164",
+            Profile::TcpSyslog5424 => "tcp-syslog5424",
+            Profile::UdpSyslog3164 => "udp-syslog3164",
+            Profile::HttpNdjson => "http-ndjson",
+        };
+        s.fmt(f)
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ValueEnum)]
 #[serde(rename_all = "lowercase")]
 pub enum MessageType {
     Syslog3164,
     Syslog5424,
     Syslog5424Octet,
     NdJson,
+    #[serde(rename = "splunk-hec", alias = "splunkhec", alias = "splunkHec")]
     SplunkHec,
 }
 

@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use super::{FullConfig, MessageType, Protocol, cli::CliArgs};
+use super::{FullConfig, MessageType, Profile, Protocol, cli::CliArgs};
 
 pub const DEFAULT_HEC_TOKEN: &str = "protoglot-hec-token";
 pub const DEFAULT_HEC_BATCH_SIZE: u64 = 100;
@@ -89,6 +89,65 @@ impl EmitterConfig {
             return self.merge(emitter_config);
         }
         self
+    }
+}
+
+impl PartialEmitterConfig {
+    pub fn for_profile(profile: Profile) -> Self {
+        match profile {
+            Profile::SplunkHec => Self {
+                host: Some("127.0.0.1".to_string()),
+                protocol: Some(Protocol::Http),
+                port: Some(8088),
+                message_type: Some(MessageType::SplunkHec),
+                events_per_cycle: Some(100),
+                num_cycles: Some(1),
+                cycle_delay: Some(0),
+                hec_token: Some(DEFAULT_HEC_TOKEN.to_string()),
+                hec_batch_size: Some(DEFAULT_HEC_BATCH_SIZE),
+                ..Default::default()
+            },
+            Profile::TcpSyslog3164 => Self {
+                host: Some("127.0.0.1".to_string()),
+                protocol: Some(Protocol::Tcp),
+                port: Some(9514),
+                message_type: Some(MessageType::Syslog3164),
+                events_per_cycle: Some(100),
+                num_cycles: Some(1),
+                cycle_delay: Some(0),
+                ..Default::default()
+            },
+            Profile::TcpSyslog5424 => Self {
+                host: Some("127.0.0.1".to_string()),
+                protocol: Some(Protocol::Tcp),
+                port: Some(9514),
+                message_type: Some(MessageType::Syslog5424),
+                events_per_cycle: Some(100),
+                num_cycles: Some(1),
+                cycle_delay: Some(0),
+                ..Default::default()
+            },
+            Profile::UdpSyslog3164 => Self {
+                host: Some("127.0.0.1".to_string()),
+                protocol: Some(Protocol::Udp),
+                port: Some(9514),
+                message_type: Some(MessageType::Syslog3164),
+                events_per_cycle: Some(100),
+                num_cycles: Some(1),
+                cycle_delay: Some(0),
+                ..Default::default()
+            },
+            Profile::HttpNdjson => Self {
+                host: Some("127.0.0.1".to_string()),
+                protocol: Some(Protocol::Http),
+                port: Some(8080),
+                message_type: Some(MessageType::NdJson),
+                events_per_cycle: Some(100),
+                num_cycles: Some(1),
+                cycle_delay: Some(0),
+                ..Default::default()
+            },
+        }
     }
 }
 

@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use clap::{ArgAction, Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 
-use super::{MessageType, Protocol, absorber::HttpAuth};
+use super::{MessageType, Profile, Protocol, absorber::HttpAuth};
 
 #[derive(Clone, Debug, Deserialize, Parser, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -12,6 +12,11 @@ pub struct CliArgs {
     /// Path to the configuration file
     #[arg(short, long)]
     pub file: Option<PathBuf>,
+
+    /// Built-in profile to use as a base before file and CLI overrides
+    #[arg(long, value_enum)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub profile: Option<Profile>,
 
     /// Target host
     #[arg(short = 'H', long)]
@@ -140,5 +145,20 @@ pub enum Commands {
         #[arg(long)]
         #[serde(skip_serializing_if = "Option::is_none")]
         overwrite: Option<bool>,
+
+        /// Built-in profile to render into the config template
+        #[arg(long, value_enum)]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        profile: Option<Profile>,
+
+        /// Write a JSON template in the current working directory instead of the user config path
+        #[arg(long, action = ArgAction::SetTrue)]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        template: Option<bool>,
+
+        /// Output path for a config template; relative paths are resolved from the current directory
+        #[arg(long)]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        output: Option<PathBuf>,
     },
 }

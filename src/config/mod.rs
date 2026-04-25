@@ -16,7 +16,7 @@ pub use emitter::EmitterConfig;
 use emitter::PartialEmitterConfig;
 use log::{debug, info, trace};
 use serde::{Deserialize, Serialize};
-pub use types::{MessageType, Protocol};
+pub use types::{MessageType, Profile, Protocol};
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -101,8 +101,18 @@ impl AppSettings {
                     mode: AppMode::Absorber,
                 }
             }
-            Some(Commands::Config { overwrite }) => {
-                write_default_config(overwrite.unwrap_or(false))?;
+            Some(Commands::Config {
+                overwrite,
+                profile,
+                template,
+                output,
+            }) => {
+                write_default_config(
+                    overwrite.unwrap_or(false),
+                    profile.clone(),
+                    template.unwrap_or(false),
+                    output.clone(),
+                )?;
                 Self {
                     emitter: None,
                     absorber: None,
@@ -139,6 +149,12 @@ impl AppSettings {
 
         // overwrite with config file from standard location, if present
         config = config.merge_from(load_default_config_file());
+
+        // overwrite with selected profile, if present
+        if let Some(profile) = args.profile.clone() {
+            debug!(profile = profile.to_string(); "Applying emitter profile");
+            config = config.merge(PartialEmitterConfig::for_profile(profile));
+        }
 
         // overwrite with passed-in file, if exists
         if let Some(ref file_path) = args.file {
@@ -210,9 +226,16 @@ fn default_config_path() -> PathBuf {
     proj_dirs.config_dir().join("config.json5")
 }
 
-fn write_default_config(overwrite: bool) -> anyhow::Result<()> {
+fn write_default_config(overwrite: bool, profile: Option<Profile>, template: bool, output: Option<PathBuf>) -> anyhow::Result<()> {
     trace!("Writing out config file");
-    let config_file = default_config_path();
+    let config_file = output.unwrap_or_else(|| {
+        if template {
+            let profile_name = profile.as_ref().map_or("default".to_string(), ToString::to_string);
+            PathBuf::from(format!("protoglot.{profile_name}.json"))
+        } else {
+            default_config_path()
+        }
+    });
     let fname = config_file.to_string_lossy();
     let should_write = match (config_file.exists(), overwrite) {
         (true, false) => {
@@ -238,14 +261,12 @@ fn write_default_config(overwrite: bool) -> anyhow::Result<()> {
     };
 
     if should_write {
-        let default_emitter = EmitterConfig::default();
-        let default_absorber = AbsorberConfig::default();
-        let cfg = FullConfig {
-            emitter: Some(default_emitter.into()),
-            absorber: Some(default_absorber.into()),
-        };
-        let parent = config_file.parent().unwrap();
-        std::fs::create_dir_all(parent)?;
+        let cfg = config_template(profile);
+        if let Some(parent) = config_file.parent()
+            && !parent.as_os_str().is_empty()
+        {
+            std::fs::create_dir_all(parent)?;
+        }
         std::fs::write(&config_file, serde_json::to_string_pretty(&cfg)?)?;
         println!("Wrote default configuration to {}", config_file.display())
     }
@@ -253,8 +274,25 @@ fn write_default_config(overwrite: bool) -> anyhow::Result<()> {
     Ok(())
 }
 
+fn config_template(profile: Option<Profile>) -> FullConfig {
+    if let Some(profile) = profile {
+        let emitter = EmitterConfig::default().merge(PartialEmitterConfig::for_profile(profile));
+        return FullConfig {
+            emitter: Some(emitter.into()),
+            absorber: None,
+        };
+    }
+
+    FullConfig {
+        emitter: Some(EmitterConfig::default().into()),
+        absorber: Some(AbsorberConfig::default().into()),
+    }
+}
+
 #[cfg(test)]
 mod test_config_subcommand {
+    use std::path::PathBuf;
+
     use clap::Parser as _;
     use pretty_assertions::{assert_eq, assert_ne};
     use sealed_test::prelude::*;
@@ -272,6 +310,25 @@ mod test_config_subcommand {
         let dir = ProjectDirs::from("com", "ansonvandoren", "protoglot").unwrap();
         let expected_path = dir.config_dir().join("config.json5");
         assert!(expected_path.exists());
+    }
+
+    #[sealed_test(env = [("XDG_CONFIG_HOME", "./.config"), ("HOME", "./")])]
+    fn writes_profile_template_in_current_directory() {
+        let args = ["protoglot", "config", "--template", "--profile", "splunk-hec"];
+        let args = CliArgs::parse_from(args.iter());
+
+        AppSettings::load(args).unwrap();
+
+        let expected_path = PathBuf::from("protoglot.splunk-hec.json");
+        assert!(expected_path.exists());
+        let read_back = std::fs::read_to_string(expected_path).unwrap();
+        let value: serde_json::Value = serde_json::from_str(&read_back).unwrap();
+        let emitter = value.get("emitter").unwrap();
+        assert_eq!(emitter.get("host").unwrap(), "127.0.0.1");
+        assert_eq!(emitter.get("port").unwrap(), 8088);
+        assert_eq!(emitter.get("messageType").unwrap(), "splunk-hec");
+        assert_eq!(emitter.get("eventsPerCycle").unwrap(), 100);
+        assert!(value.get("absorber").is_none());
     }
 
     #[sealed_test(env = [("XDG_CONFIG_HOME", "./.config"), ("HOME", "./")])]
@@ -687,5 +744,24 @@ mod test_load_emitter {
         assert_matches!(found.message_type, MessageType::SplunkHec);
         assert_eq!(found.hec_token, "custom-token");
         assert_eq!(found.hec_batch_size, 250);
+    }
+
+    #[sealed_test(env = [("XDG_CONFIG_HOME", "./.config"), ("HOME", "./")])]
+    fn profile_is_runnable_without_additional_options() {
+        let args = ["protoglot", "--profile", "splunk-hec"];
+        let args = CliArgs::parse_from(args.iter());
+
+        let config = AppSettings::load_emitter_config(args).unwrap();
+
+        let found: EmitterConfig = config.emitter.unwrap();
+        assert_eq!(found.host, "127.0.0.1");
+        assert_eq!(found.port, 8088);
+        assert_matches!(found.protocol, Protocol::Http);
+        assert_matches!(found.message_type, MessageType::SplunkHec);
+        assert_eq!(found.hec_token, "protoglot-hec-token");
+        assert_eq!(found.hec_batch_size, 100);
+        assert_eq!(found.events_per_cycle, 100);
+        assert_eq!(found.num_cycles, 1);
+        assert_eq!(found.cycle_delay, 0);
     }
 }
