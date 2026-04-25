@@ -4,19 +4,19 @@ use async_compression::tokio::bufread::{BrotliDecoder, GzipDecoder, Lz4Decoder, 
 use bytes::Bytes;
 use http_body_util::BodyExt;
 use hyper::{
+    Request, Response,
     header::CONTENT_ENCODING,
     server::conn::{http1, http2},
     service::service_fn,
-    Request, Response,
 };
 use hyper_util::rt::TokioIo;
 use log::{debug, error, info};
 use tokio::net::TcpListener;
 use tokio_rustls::TlsAcceptor;
-use tokio_stream::{wrappers::TcpListenerStream, StreamExt};
+use tokio_stream::{StreamExt, wrappers::TcpListenerStream};
 use tokio_util::io::StreamReader;
 
-use super::{extract_message, get_cert, validate_message, AbsorberInner, ConnOptions, StatsSvc};
+use super::{AbsorberInner, ConnOptions, StatsSvc, extract_message, get_cert, validate_message};
 use crate::config::MessageType;
 
 pub struct HttpAbsorber {
@@ -142,10 +142,10 @@ async fn handle_request(
     message_type: MessageType,
     token: Option<String>,
 ) -> Result<Response<String>, hyper::Error> {
-    if let Some(token) = token {
-        if let Err(err) = check_auth(&req, token) {
-            return Ok(err);
-        }
+    if let Some(token) = token
+        && let Err(err) = check_auth(&req, token)
+    {
+        return Ok(*err);
     }
     let stream = get_decompressed(req, stats.clone());
 
@@ -158,23 +158,25 @@ async fn handle_request(
     Ok(Response::new("OK".to_string()))
 }
 
-fn check_auth(req: &Request<hyper::body::Incoming>, expected: String) -> Result<(), Response<String>> {
+fn check_auth(req: &Request<hyper::body::Incoming>, expected: String) -> Result<(), Box<Response<String>>> {
     let token = req
         .headers()
         .get(hyper::header::AUTHORIZATION)
         .and_then(|value| value.to_str().ok())
         .map(|s| s.to_string());
 
-    if let Some(auth_value) = &token {
-        if auth_value == &expected {
-            return Ok(());
-        }
+    if let Some(auth_value) = &token
+        && auth_value == &expected
+    {
+        return Ok(());
     }
     error!("Unauthorized access attempt. Wanted: {}, got: {:?}", expected, token);
-    Err(Response::builder()
-        .status(hyper::StatusCode::UNAUTHORIZED)
-        .body("Unauthorized".to_string())
-        .unwrap())
+    Err(Box::new(
+        Response::builder()
+            .status(hyper::StatusCode::UNAUTHORIZED)
+            .body("Unauthorized".to_string())
+            .unwrap(),
+    ))
 }
 
 struct StatsUpdate {

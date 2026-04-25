@@ -2,7 +2,7 @@ use std::fmt;
 
 use log::error;
 
-use crate::config::{EmitterConfig, Protocol};
+use crate::config::{EmitterConfig, MessageType, Protocol};
 
 pub mod http;
 pub mod tcp;
@@ -11,8 +11,9 @@ pub mod udp;
 
 pub enum TransportType {
     Tcp(tcp::TcpTransport),
-    TcpTls(tcp_tls::TcpTlsTransport),
+    TcpTls(Box<tcp_tls::TcpTlsTransport>),
     Udp(udp::UdpTransport),
+    Http(http::HttpTransport),
 }
 
 impl Transport for TransportType {
@@ -21,6 +22,7 @@ impl Transport for TransportType {
             TransportType::Tcp(transport) => transport.send(data).await,
             TransportType::TcpTls(transport) => transport.send(data).await,
             TransportType::Udp(transport) => transport.send(data).await,
+            TransportType::Http(transport) => transport.send(data).await,
         }
     }
 }
@@ -35,6 +37,7 @@ impl fmt::Display for TransportType {
             TransportType::Tcp(transport) => write!(f, "{}", transport),
             TransportType::TcpTls(transport) => write!(f, "{}", transport),
             TransportType::Udp(transport) => write!(f, "{}", transport),
+            TransportType::Http(transport) => write!(f, "{}", transport),
         }
     }
 }
@@ -45,10 +48,10 @@ pub async fn create_transport(config: &EmitterConfig) -> anyhow::Result<Transpor
             let use_tls = config.tls || matches!(config.protocol, Protocol::Tcps);
             if use_tls {
                 match tcp_tls::TcpTlsTransport::new(config.host.clone(), config.port).await {
-                    Ok(transport) => Ok(TransportType::TcpTls(transport)),
+                    Ok(transport) => Ok(TransportType::TcpTls(Box::new(transport))),
                     Err(err) => {
                         error!("Failed to create TcpTlsTransport: {}", err);
-                        Err(err.into())
+                        Err(err)
                     }
                 }
             } else {
@@ -68,6 +71,15 @@ pub async fn create_transport(config: &EmitterConfig) -> anyhow::Result<Transpor
                 Err(err.into())
             }
         },
-        Protocol::Http | Protocol::Https => todo!(),
+        Protocol::Http | Protocol::Https => {
+            let protocol = config.protocol.to_string();
+            let hec_token = match config.message_type {
+                MessageType::SplunkHec => Some(config.hec_token.clone()),
+                _ => None,
+            };
+            http::HttpTransport::new(&protocol, config.host.clone(), config.port, hec_token)
+                .map(TransportType::Http)
+                .inspect_err(|err| error!("Failed to create HttpTransport: {}", err))
+        }
     }
 }

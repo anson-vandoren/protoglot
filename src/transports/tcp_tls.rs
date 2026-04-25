@@ -2,7 +2,7 @@ use std::{fmt, sync::Arc};
 
 use anyhow::Context as _;
 use log::{debug, error};
-use rustls::{pki_types::ServerName, ClientConfig, RootCertStore};
+use rustls::{ClientConfig, RootCertStore, pki_types::ServerName};
 use tokio::{
     net::TcpStream,
     time::{self, Duration},

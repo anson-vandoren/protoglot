@@ -46,6 +46,7 @@ pub enum MessageType {
     Syslog5424,
     Syslog5424Octet,
     NdJson,
+    SplunkHec,
 }
 
 impl TryFrom<&str> for MessageType {
@@ -57,6 +58,7 @@ impl TryFrom<&str> for MessageType {
             "syslog5424" => Ok(Self::Syslog5424),
             "syslog5424-octet" => Ok(Self::Syslog5424Octet),
             "ndjson" => Ok(Self::NdJson),
+            "splunk-hec" | "splunkhec" | "splunkHec" => Ok(Self::SplunkHec),
             _ => Err(anyhow::anyhow!("Unknown message type '{value}'")),
         }
     }
@@ -69,6 +71,7 @@ impl std::fmt::Display for MessageType {
             MessageType::Syslog5424 => "syslog5424",
             MessageType::Syslog5424Octet => "syslog5424-octet",
             MessageType::NdJson => "ndjson",
+            MessageType::SplunkHec => "splunk-hec",
         };
         s.fmt(f)
     }

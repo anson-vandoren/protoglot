@@ -5,7 +5,7 @@ mod generators;
 mod transports;
 
 use clap::Parser as _;
-use config::AppMode;
+use config::{AppMode, MessageType};
 use emitter::{Emitter, EmitterConfig};
 use generators::create_generator;
 use log::{error, info};
@@ -41,6 +41,10 @@ async fn main() -> anyhow::Result<()> {
                 num_cycles: emitter_config.num_cycles,
                 events_per_cycle: emitter_config.events_per_cycle,
                 cycle_delay: emitter_config.cycle_delay,
+                batch_size: match emitter_config.message_type {
+                    MessageType::SplunkHec => emitter_config.hec_batch_size,
+                    _ => 1,
+                },
             };
             let mut emitter = Emitter::new(transport, generator, emitter_config);
 

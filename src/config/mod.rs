@@ -281,7 +281,7 @@ mod test_config_subcommand {
         let dir = ProjectDirs::from("com", "ansonvandoren", "protoglot").unwrap();
         let expected_path = dir.config_dir().join("config.json5");
 
-        std::fs::create_dir_all(&expected_path.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(expected_path.parent().unwrap()).unwrap();
         std::fs::write(&expected_path, "test").unwrap();
 
         AppSettings::load(args).unwrap();
@@ -298,7 +298,7 @@ mod test_config_subcommand {
         let dir = ProjectDirs::from("com", "ansonvandoren", "protoglot").unwrap();
         let expected_path = dir.config_dir().join("config.json5");
 
-        std::fs::create_dir_all(&expected_path.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(expected_path.parent().unwrap()).unwrap();
         std::fs::write(&expected_path, "test").unwrap();
 
         AppSettings::load(args).unwrap();
@@ -335,7 +335,7 @@ mod test_load_absorber {
     use sealed_test::prelude::*;
 
     use super::*;
-    use crate::config::{cli::CliArgs, MessageType};
+    use crate::config::{MessageType, cli::CliArgs};
 
     #[sealed_test(env = [("XDG_CONFIG_HOME", "./.config"), ("HOME", "./")])]
     fn uses_defaults_when_nothing_else() {
@@ -346,7 +346,7 @@ mod test_load_absorber {
 
         assert_matches!(config.mode, AppMode::Absorber);
         assert!(config.emitter.is_none());
-        let found: AbsorberConfig = config.absorber.unwrap().try_into().unwrap();
+        let found: AbsorberConfig = config.absorber.unwrap();
         assert_eq!(found, AbsorberConfig::default());
     }
 
@@ -366,7 +366,7 @@ mod test_load_absorber {
         let config_dir = ProjectDirs::from("com", "ansonvandoren", "protoglot").unwrap();
         let config_path = config_dir.config_dir().join("config.json5");
 
-        std::fs::create_dir_all(&config_path.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(config_path.parent().unwrap()).unwrap();
         let config_as_str = serde_json::to_string(&config).unwrap();
         std::fs::write(&config_path, config_as_str).unwrap();
 
@@ -377,7 +377,7 @@ mod test_load_absorber {
 
         assert_matches!(config.mode, AppMode::Absorber);
         assert!(config.emitter.is_none());
-        let found: AbsorberConfig = config.absorber.unwrap().try_into().unwrap();
+        let found: AbsorberConfig = config.absorber.unwrap();
         assert_matches!(
             found,
             AbsorberConfig {
@@ -404,7 +404,7 @@ mod test_load_absorber {
         };
         let config_dir = ProjectDirs::from("com", "ansonvandoren", "protoglot").unwrap();
         let config_path = config_dir.config_dir().join("config.json5");
-        std::fs::create_dir_all(&config_path.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(config_path.parent().unwrap()).unwrap();
         let config_as_str = serde_json::to_string(&config).unwrap();
         std::fs::write(&config_path, config_as_str).unwrap();
 
@@ -430,7 +430,7 @@ mod test_load_absorber {
 
         assert_matches!(config.mode, AppMode::Absorber);
         assert!(config.emitter.is_none());
-        let found: AbsorberConfig = config.absorber.unwrap().try_into().unwrap();
+        let found: AbsorberConfig = config.absorber.unwrap();
         assert_matches!(
             found,
             AbsorberConfig {
@@ -457,7 +457,7 @@ mod test_load_absorber {
         };
         let config_dir = ProjectDirs::from("com", "ansonvandoren", "protoglot").unwrap();
         let config_path = config_dir.config_dir().join("config.json5");
-        std::fs::create_dir_all(&config_path.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(config_path.parent().unwrap()).unwrap();
         let config_as_str = serde_json::to_string(&config).unwrap();
         std::fs::write(&config_path, config_as_str).unwrap();
 
@@ -492,7 +492,7 @@ mod test_load_absorber {
 
         assert_matches!(config.mode, AppMode::Absorber);
         assert!(config.emitter.is_none());
-        let found: AbsorberConfig = config.absorber.unwrap().try_into().unwrap();
+        let found: AbsorberConfig = config.absorber.unwrap();
         assert_matches!(
             found,
             AbsorberConfig {
@@ -525,7 +525,7 @@ mod test_load_emitter {
 
         assert_matches!(config.mode, AppMode::Emitter);
         assert!(config.absorber.is_none());
-        let found: EmitterConfig = config.emitter.unwrap().try_into().unwrap();
+        let found: EmitterConfig = config.emitter.unwrap();
         assert_eq!(found, EmitterConfig::default());
     }
 
@@ -544,7 +544,7 @@ mod test_load_emitter {
         let config_dir = ProjectDirs::from("com", "ansonvandoren", "protoglot").unwrap();
         let config_path = config_dir.config_dir().join("config.json5");
 
-        std::fs::create_dir_all(&config_path.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(config_path.parent().unwrap()).unwrap();
         let config_as_str = serde_json::to_string(&config).unwrap();
         std::fs::write(&config_path, config_as_str).unwrap();
 
@@ -555,7 +555,7 @@ mod test_load_emitter {
 
         assert_matches!(config.mode, AppMode::Emitter);
         assert!(config.absorber.is_none());
-        let found: EmitterConfig = config.emitter.unwrap().try_into().unwrap();
+        let found: EmitterConfig = config.emitter.unwrap();
         assert_matches!(found, EmitterConfig { port: 4242, .. });
     }
 
@@ -573,7 +573,7 @@ mod test_load_emitter {
         };
         let config_dir = ProjectDirs::from("com", "ansonvandoren", "protoglot").unwrap();
         let config_path = config_dir.config_dir().join("config.json5");
-        std::fs::create_dir_all(&config_path.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(config_path.parent().unwrap()).unwrap();
         let config_as_str = serde_json::to_string(&config).unwrap();
         std::fs::write(&config_path, config_as_str).unwrap();
 
@@ -597,14 +597,14 @@ mod test_load_emitter {
 
         assert_matches!(config.mode, AppMode::Emitter);
         assert!(config.absorber.is_none());
-        let found: EmitterConfig = config.emitter.unwrap().try_into().unwrap();
+        let found: EmitterConfig = config.emitter.unwrap();
         assert_matches!(
             found,
             EmitterConfig {
                 port: 4243,
                 host,
                 ..
-            } if host == "icanhashostname.com".to_string()
+            } if host == "icanhashostname.com"
         );
     }
 
@@ -622,7 +622,7 @@ mod test_load_emitter {
         };
         let config_dir = ProjectDirs::from("com", "ansonvandoren", "protoglot").unwrap();
         let config_path = config_dir.config_dir().join("config.json5");
-        std::fs::create_dir_all(&config_path.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(config_path.parent().unwrap()).unwrap();
         let config_as_str = serde_json::to_string(&config).unwrap();
         std::fs::write(&config_path, config_as_str).unwrap();
 
@@ -654,14 +654,38 @@ mod test_load_emitter {
 
         assert_matches!(config.mode, AppMode::Emitter);
         assert!(config.absorber.is_none());
-        let found: EmitterConfig = config.emitter.unwrap().try_into().unwrap();
+        let found: EmitterConfig = config.emitter.unwrap();
         assert_matches!(
             found,
             EmitterConfig {
                 port: 11000,
                 host,
                 ..
-            } if host == "someotherhostname.com".to_string()
+            } if host == "someotherhostname.com"
         );
+    }
+
+    #[sealed_test(env = [("XDG_CONFIG_HOME", "./.config"), ("HOME", "./")])]
+    fn merges_hec_cli_opts() {
+        let args = [
+            "protoglot",
+            "--protocol",
+            "http",
+            "--message-type",
+            "splunk-hec",
+            "--hec-token",
+            "custom-token",
+            "--hec-batch-size",
+            "250",
+        ];
+        let args = CliArgs::parse_from(args.iter());
+
+        let config = AppSettings::load_emitter_config(args).unwrap();
+
+        let found: EmitterConfig = config.emitter.unwrap();
+        assert_matches!(found.protocol, Protocol::Http);
+        assert_matches!(found.message_type, MessageType::SplunkHec);
+        assert_eq!(found.hec_token, "custom-token");
+        assert_eq!(found.hec_batch_size, 250);
     }
 }

@@ -2,7 +2,9 @@ use std::time::Duration;
 
 use human_bytes::human_bytes;
 use log::info;
-use tokio::{sync::{mpsc, oneshot}, time::Instant};
+#[cfg(test)]
+use tokio::sync::oneshot;
+use tokio::{sync::mpsc, time::Instant};
 
 use super::human_events;
 
@@ -105,11 +107,22 @@ impl StatsSvc {
     }
 
     pub async fn increment(&self, events: usize, raw_bytes: usize, decomp_bytes: usize) {
-        self.tx.send(StatsMessage::Increment { events, raw_bytes, decomp_bytes }).await.unwrap();
+        self.tx
+            .send(StatsMessage::Increment {
+                events,
+                raw_bytes,
+                decomp_bytes,
+            })
+            .await
+            .unwrap();
     }
 
     pub fn try_increment(&self, events: usize, raw_bytes: usize, decomp_bytes: usize) {
-        let _ = self.tx.try_send(StatsMessage::Increment { events, raw_bytes, decomp_bytes });
+        let _ = self.tx.try_send(StatsMessage::Increment {
+            events,
+            raw_bytes,
+            decomp_bytes,
+        });
     }
 
     pub async fn reset(&self) {
@@ -126,7 +139,11 @@ impl StatsSvc {
 
 #[derive(Debug)]
 enum StatsMessage {
-    Increment { events: usize, raw_bytes: usize, decomp_bytes: usize },
+    Increment {
+        events: usize,
+        raw_bytes: usize,
+        decomp_bytes: usize,
+    },
     Reset,
     #[cfg(test)]
     GetStats(oneshot::Sender<(usize, usize, usize)>),
@@ -161,12 +178,12 @@ mod tests {
     #[test]
     fn test_absorber_stats_increment() {
         let mut stats = AbsorberStats::new();
-        
+
         // Uncompressed increment
         stats.total_events += 1;
         stats.total_raw_bytes += 100;
         stats.total_decomp_bytes += 100;
-        
+
         assert_eq!(stats.total_events, 1);
         assert_eq!(stats.total_raw_bytes, 100);
         assert_eq!(stats.total_decomp_bytes, 100);

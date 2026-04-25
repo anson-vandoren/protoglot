@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use clap::{ArgAction, Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 
-use super::{absorber::HttpAuth, MessageType, Protocol};
+use super::{MessageType, Protocol, absorber::HttpAuth};
 
 #[derive(Clone, Debug, Deserialize, Parser, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -62,6 +62,16 @@ pub struct CliArgs {
     #[arg(long)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cycle_delay: Option<u64>,
+
+    /// Splunk HEC token used for emitted HEC payloads
+    #[arg(long = "hec-token")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hec_token: Option<String>,
+
+    /// Number of HEC events to include in each HTTP POST body
+    #[arg(long = "hec-batch-size")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hec_batch_size: Option<u64>,
 
     /// Control output verbosity
     #[arg(short, action = clap::ArgAction::Count)]

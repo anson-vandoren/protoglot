@@ -23,8 +23,8 @@ use tokio::io::{AsyncRead, ReadBuf};
 use udp::UdpAbsorber;
 
 use crate::config::{
-    absorber::{AbsorberConfig, HttpAuth},
     ListenAddress, MessageType, Protocol,
+    absorber::{AbsorberConfig, HttpAuth},
 };
 
 #[derive(Clone)]
@@ -70,10 +70,7 @@ impl From<&AbsorberConfig> for Vec<ConnOptions> {
             .listen_addresses
             .iter()
             .map(|addr| {
-                let addr_tls = match addr.protocol {
-                    Protocol::Https | Protocol::Tcps => true,
-                    _ => false,
-                };
+                let addr_tls = matches!(addr.protocol, Protocol::Https | Protocol::Tcps);
                 let use_tls = config.https || config.http2 || addr_tls;
 
                 let cert_type = if use_tls {
@@ -164,7 +161,7 @@ async fn handle_user_input(stats: StatsSvc) -> anyhow::Result<()> {
         match input {
             Some(input) => {
                 let trimmed = input.trim();
-                if trimmed.is_empty() && input.len() == 0 {
+                if trimmed.is_empty() && input.is_empty() {
                     // EOF
                     break;
                 }
@@ -249,12 +246,20 @@ fn validate_ndjson(message: &[u8]) -> bool {
     serde_json::from_slice::<serde_json::Value>(message).is_ok()
 }
 
+fn validate_splunk_hec(message: &[u8]) -> bool {
+    let Ok(value) = serde_json::from_slice::<serde_json::Value>(message) else {
+        return false;
+    };
+    value.get("event").is_some()
+}
+
 pub(super) fn validate_message(message: &[u8], typ: &MessageType) -> bool {
     match typ {
         MessageType::Syslog3164 => validate_syslog3164(message),
         MessageType::Syslog5424 => validate_syslog5424(message),
         MessageType::Syslog5424Octet => validate_syslog5424(message),
         MessageType::NdJson => validate_ndjson(message),
+        MessageType::SplunkHec => validate_splunk_hec(message),
     }
 }
 

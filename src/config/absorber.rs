@@ -2,7 +2,7 @@ use clap::ValueEnum;
 use log::{info, warn};
 use serde::{Deserialize, Serialize};
 
-use super::{cli::Commands, FullConfig, ListenAddress, MessageType};
+use super::{FullConfig, ListenAddress, MessageType, cli::Commands};
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize, ValueEnum)]
 #[serde(rename_all = "camelCase")]
@@ -123,10 +123,10 @@ impl AbsorberConfig {
     }
 
     pub fn merge_from(self, other: Option<FullConfig>) -> Self {
-        if let Some(full_config) = other {
-            if let Some(absorber_config) = full_config.absorber {
-                return self.merge(absorber_config);
-            }
+        if let Some(full_config) = other
+            && let Some(absorber_config) = full_config.absorber
+        {
+            return self.merge(absorber_config);
         }
         self
     }

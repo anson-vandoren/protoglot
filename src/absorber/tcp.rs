@@ -78,10 +78,8 @@ impl TcpAbsorber {
                             error!("TLS handshake failed with {}: {:?}", remote_addr, err);
                         }
                     }
-                } else {
-                    if let Err(e) = handle_tcp_connection(socket, &stats, &message_type).await {
-                        eprintln!("Error handling plain TCP connection: {}", e);
-                    }
+                } else if let Err(e) = handle_tcp_connection(socket, &stats, &message_type).await {
+                    eprintln!("Error handling plain TCP connection: {}", e);
                 }
             });
         }

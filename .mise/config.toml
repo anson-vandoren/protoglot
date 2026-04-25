@@ -1,0 +1,92 @@
+[tools]
+"aqua:nextest-rs/nextest/cargo-nextest" = "latest"
+"cargo:cargo-deny" = "latest"
+"cargo:cargo-edit" = "latest"
+"cargo:cargo-machete" = "latest"
+"cargo:cargo-sort" = "latest"
+"cargo:cargo-sort-derives" = "latest"
+rust = "latest"
+
+[tasks.build]
+description = "Build protoglot"
+run = "cargo build"
+
+[tasks."build:release"]
+description = "Build optimized protoglot binary"
+run = "cargo build --release"
+
+[tasks.run]
+description = "Run protoglot with default emitter mode"
+depends = ["build"]
+run = "cargo run --"
+
+[tasks.help]
+description = "Show top-level CLI help"
+depends = ["build"]
+run = "cargo run -- --help"
+
+[tasks."help:absorber"]
+description = "Show absorber CLI help"
+depends = ["build"]
+run = "cargo run -- absorber --help"
+
+[tasks.config]
+description = "Write the default user config if missing"
+depends = ["build"]
+run = "cargo run -- config"
+
+[tasks.test]
+description = "Run Rust tests with nextest"
+env = { RUST_LOG = "warn,protoglot=trace" }
+run = "cargo nextest run --status-level fail"
+
+[tasks.tv]
+description = "Run Rust tests verbosely with captured output"
+env = { RUST_LOG = "warn,protoglot=trace" }
+run = "cargo nextest run --no-capture"
+
+[tasks.testes]
+description = "Run all Rust tests without fail-fast"
+env = { RUST_LOG = "warn,protoglot=trace" }
+run = "cargo nextest run --no-fail-fast --status-level fail"
+
+[tasks."test:ci"]
+description = "Run tests the same way GitHub Actions does"
+run = "cargo test --verbose"
+
+[tasks.clippy]
+description = "Run clippy for all targets and features"
+run = "cargo clippy --all-targets --all-features"
+
+[tasks.fmt]
+description = "Format Rust code with stable project rustfmt settings"
+run = "cargo fmt -- --config-path .rustfmt.stable.toml"
+
+[tasks."fmt:check"]
+description = "Check Rust formatting with stable project rustfmt settings"
+run = "cargo fmt -- --check --config-path .rustfmt.stable.toml"
+
+[tasks."fmt:nightly"]
+description = "Format Rust code with full nightly rustfmt settings"
+run = "cargo +nightly fmt"
+
+[tasks."fmt:nightly-check"]
+description = "Check Rust formatting with full nightly rustfmt settings"
+run = "cargo +nightly fmt -- --check"
+
+[tasks.pre-commit]
+description = "Run local checks before committing"
+depends = ["fmt:check", "clippy", "test"]
+
+[tasks.ci]
+description = "Run checks matching the GitHub Actions build"
+depends = ["build", "test:ci"]
+
+[tasks."docker:build"]
+description = "Build local Docker image"
+run = "docker build -t protoglot:local ."
+
+[tasks."docker:smoke"]
+description = "Build Docker image and verify CLI help"
+depends = ["docker:build"]
+run = "docker run --rm protoglot:local --help"

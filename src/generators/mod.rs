@@ -1,8 +1,10 @@
 mod nd_json;
+mod splunk_hec;
 mod syslog3164;
 mod syslog5424;
 
 pub use nd_json::NdJsonEventGenerator;
+pub use splunk_hec::SplunkHecEventGenerator;
 pub use syslog3164::Syslog3164EventGenerator;
 pub use syslog5424::Syslog5424EventGenerator;
 
@@ -12,6 +14,7 @@ pub enum EventType {
     Syslog3164(Syslog3164EventGenerator),
     Syslog5424(Syslog5424EventGenerator),
     NdJson(NdJsonEventGenerator),
+    SplunkHec(SplunkHecEventGenerator),
 }
 
 impl EventGenerator for EventType {
@@ -20,6 +23,7 @@ impl EventGenerator for EventType {
             EventType::Syslog3164(generator) => generator.generate_into(buf),
             EventType::Syslog5424(generator) => generator.generate_into(buf),
             EventType::NdJson(generator) => generator.generate_into(buf),
+            EventType::SplunkHec(generator) => generator.generate_into(buf),
         }
     }
 }
@@ -33,5 +37,6 @@ pub fn create_generator(message_type: &MessageType) -> EventType {
         MessageType::Syslog5424 => EventType::Syslog5424(Syslog5424EventGenerator::new(false)),
         MessageType::Syslog5424Octet => EventType::Syslog5424(Syslog5424EventGenerator::new(true)),
         MessageType::NdJson => EventType::NdJson(NdJsonEventGenerator::new()),
+        MessageType::SplunkHec => EventType::SplunkHec(SplunkHecEventGenerator::new()),
     }
 }

@@ -1,6 +1,6 @@
 use tokio::net::UdpSocket;
 
-use super::{process_message, AbsorberInner, ConnOptions, StatsSvc};
+use super::{AbsorberInner, ConnOptions, StatsSvc, process_message};
 use crate::config::MessageType;
 
 pub struct UdpAbsorber {

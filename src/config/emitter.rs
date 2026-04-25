@@ -1,6 +1,9 @@
 use serde::{Deserialize, Serialize};
 
-use super::{cli::CliArgs, FullConfig, MessageType, Protocol};
+use super::{FullConfig, MessageType, Protocol, cli::CliArgs};
+
+pub const DEFAULT_HEC_TOKEN: &str = "protoglot-hec-token";
+pub const DEFAULT_HEC_BATCH_SIZE: u64 = 100;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -15,6 +18,8 @@ pub struct EmitterConfig {
     pub events_per_cycle: u64,
     pub num_cycles: u64,
     pub cycle_delay: u64,
+    pub hec_token: String,
+    pub hec_batch_size: u64,
 }
 
 impl Default for EmitterConfig {
@@ -30,6 +35,8 @@ impl Default for EmitterConfig {
             events_per_cycle: 10000,
             num_cycles: 1,
             cycle_delay: 10000,
+            hec_token: DEFAULT_HEC_TOKEN.to_string(),
+            hec_batch_size: DEFAULT_HEC_BATCH_SIZE,
         }
     }
 }
@@ -66,14 +73,20 @@ impl EmitterConfig {
         if let Some(other) = other.cycle_delay {
             self.cycle_delay = other;
         }
+        if let Some(other) = other.hec_token {
+            self.hec_token = other;
+        }
+        if let Some(other) = other.hec_batch_size {
+            self.hec_batch_size = other;
+        }
         self
     }
 
     pub fn merge_from(self, other: Option<FullConfig>) -> Self {
-        if let Some(full_config) = other {
-            if let Some(emitter_config) = full_config.emitter {
-                return self.merge(emitter_config);
-            }
+        if let Some(full_config) = other
+            && let Some(emitter_config) = full_config.emitter
+        {
+            return self.merge(emitter_config);
         }
         self
     }
@@ -92,6 +105,8 @@ impl From<CliArgs> for PartialEmitterConfig {
             events_per_cycle: value.events_per_cycle,
             num_cycles: value.num_cycles,
             cycle_delay: value.cycle_delay,
+            hec_token: value.hec_token,
+            hec_batch_size: value.hec_batch_size,
         }
     }
 }
@@ -119,6 +134,10 @@ pub struct PartialEmitterConfig {
     pub num_cycles: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cycle_delay: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hec_token: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hec_batch_size: Option<u64>,
 }
 
 impl From<EmitterConfig> for PartialEmitterConfig {
@@ -134,6 +153,8 @@ impl From<EmitterConfig> for PartialEmitterConfig {
             events_per_cycle: Some(value.events_per_cycle),
             num_cycles: Some(value.num_cycles),
             cycle_delay: Some(value.cycle_delay),
+            hec_token: Some(value.hec_token),
+            hec_batch_size: Some(value.hec_batch_size),
         }
     }
 }

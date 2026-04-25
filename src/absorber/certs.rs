@@ -146,15 +146,15 @@ async fn pull_public_certs() -> Result<CertKey> {
         let mut entry = entry?;
         let path = entry.path()?;
 
-        if let Some(filename) = path.file_name() {
-            if let Some(filename_str) = filename.to_str() {
-                if filename_str == "privkey.pem" {
-                    trace!("Found private key in public certs");
-                    entry.read_to_string(&mut key_pem)?;
-                } else if filename_str == "fullchain.pem" {
-                    trace!("Found cert chain in public certs");
-                    entry.read_to_string(&mut cert_pem)?;
-                }
+        if let Some(filename) = path.file_name()
+            && let Some(filename_str) = filename.to_str()
+        {
+            if filename_str == "privkey.pem" {
+                trace!("Found private key in public certs");
+                entry.read_to_string(&mut key_pem)?;
+            } else if filename_str == "fullchain.pem" {
+                trace!("Found cert chain in public certs");
+                entry.read_to_string(&mut cert_pem)?;
             }
         }
     }
