@@ -260,6 +260,18 @@ CI-style check:
 mise run ci
 ```
 
+Release the current `Cargo.toml`/`CHANGELOG.md` version:
+
+```bash
+mise run release
+```
+
+Prepare a new version interactively, then release it:
+
+```bash
+./release.sh --make-release
+```
+
 Without `mise`, the equivalent core commands are:
 
 ```bash

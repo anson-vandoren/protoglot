@@ -104,6 +104,13 @@ cargo run -- absorber --help
 cargo run -- config
 ```
 
+Release:
+
+```bash
+mise run release
+./release.sh --make-release
+```
+
 ## Required Project Rules
 
 - Write a reproduction test before fixing a bug or adding a feature whenever feasible.
@@ -161,4 +168,5 @@ cargo run -- config
 - General style guide: `conductor/code_styleguides/general.md`
 - Formatting config: `.rustfmt.toml`, `.rustfmt.stable.toml`
 - Mise task definitions: `.mise/config.toml`
+- Release script: `release.sh`
 - CI workflow: `.github/workflows/merge-and-pr-build.yml`

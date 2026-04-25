@@ -81,3 +81,7 @@ depends = ["fmt:check", "clippy", "test"]
 [tasks.ci]
 description = "Run checks matching the GitHub Actions build"
 depends = ["build", "test:ci"]
+
+[tasks.release]
+description = "Release protoglot"
+run = "./release.sh"
