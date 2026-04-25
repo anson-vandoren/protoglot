@@ -81,12 +81,3 @@ depends = ["fmt:check", "clippy", "test"]
 [tasks.ci]
 description = "Run checks matching the GitHub Actions build"
 depends = ["build", "test:ci"]
-
-[tasks."docker:build"]
-description = "Build local Docker image"
-run = "docker build -t protoglot:local ."
-
-[tasks."docker:smoke"]
-description = "Build Docker image and verify CLI help"
-depends = ["docker:build"]
-run = "docker run --rm protoglot:local --help"

@@ -1,73 +1,294 @@
 # protoglot
 
-# What's it do?
+Protoglot is a fast, practical event generator and receiver for testing data pipelines.
 
-To facilitate various testing of event pipelining (etc.) tools, it's useful to have a tool that can send and
-receive data to and from various destinations and sources.
+It can emit realistic-ish event streams over TCP, UDP, HTTP, HTTPS, and TCPS, and it can also run as an absorber that listens for incoming traffic and reports live throughput stats. It is built for quick local testing, pipeline source validation, and load-ish workflows where you need a simple binary that speaks the protocols your pipeline expects.
 
-# How do I use it?
+## Why Use It?
 
-## Building
+- Test receivers without wiring up a full upstream system.
+- Exercise TCP, UDP, HTTP, HTTPS, and TLS paths from one CLI.
+- Generate Syslog, NDJSON, and Splunk HEC payloads.
+- Batch Splunk HEC events into normal multi-event HTTP POST bodies.
+- Run an absorber to validate incoming events and watch event/byte rates.
+- Keep repeated workflows simple with built-in profiles and config templates.
 
-1. Install the Rust toolchain: https://www.rust-lang.org/tools/install
-2. Clone this repo, then `cargo build --release` from the repo root.
-3. Copy the resultant binary from `target/release/protoglot` to a location in your path.
+## Quick Start
 
-## Running from Docker
-
-If you don't want to or need to build the binary yourself, you can run it in a Docker container. The Docker image is available on
-Docker Hub at `ansonvandoren/protoglot`. To run it, you can use the following command:
-
-```bash
-docker run --rm ansonvandoren/protoglot --help
-```
-
-When running protoglot in a Docker container, the configuration options and command line arguments below still apply, but
-you would need to mount a volume to the container to provide a config file. In this case it's easier to just use the 
-command line arguments to configure the tool.
-
-**Examples**:
+Build it:
 
 ```bash
-$ docker run --rm ansonvandoren/protoglot --host 172.17.0.1 # or host.docker.internal for macfolk
+cargo build --release
 ```
 
-## Running
+Run a local Splunk HEC emitter profile:
 
-- Run `protoglot --help` to see the available options.
-- Run `protoglot config` to generate a default config at `~/.config/default.json5`.
-- If you have a JSON5 config file located in your system's config directories, that will be used in place of the default.
-  - On Linux, the path is `~/.config/protoglot/config.json5`
-  - On Windows, the path is `C:\Users\<username>\AppData\Roaming\ansonvandoren\protoglot\config\config.json5`
-  - On macOS, the path is `~/Library/Application Support/com.ansonvandoren.protoglot/config.json5`
-- If you pass a `--file` argument, protoglot will read the config from that file instead of the default or system config file.
-- Only one of the above config files will be used (in the order described), and whichever file is selected must be contain all fields present in the default config file.
-- If you wish to override specific fields from the command line, you can do so with the appropriate flags as described in the help output. Command line arguments will override both config files and environment variables.
+```bash
+protoglot --profile splunk-hec
+```
 
+That sends 100 Splunk HEC events to `http://127.0.0.1:8088/services/collector/event` using the default token `protoglot-hec-token`.
 
-# Components:
+Override only what you need:
+
+```bash
+protoglot --profile splunk-hec --host 127.0.0.1 --hec-token dev-token --events 10000
+```
+
+Start an absorber:
+
+```bash
+protoglot absorber --listen tcp://127.0.0.1:9514 --message-type syslog5424
+```
+
+## Built-In Profiles
+
+Profiles are complete runnable presets. Use them when you want the common protocol/message defaults without remembering every flag.
+
+```bash
+protoglot --profile splunk-hec
+protoglot --profile tcp-syslog3164
+protoglot --profile tcp-syslog5424
+protoglot --profile udp-syslog3164
+protoglot --profile http-ndjson
+```
+
+Current profiles:
+
+| Profile | Protocol | Host | Port | Message type | Events |
+| --- | --- | --- | --- | --- | --- |
+| `splunk-hec` | HTTP | `127.0.0.1` | `8088` | Splunk HEC | `100` |
+| `tcp-syslog3164` | TCP | `127.0.0.1` | `9514` | Syslog 3164 | `100` |
+| `tcp-syslog5424` | TCP | `127.0.0.1` | `9514` | Syslog 5424 | `100` |
+| `udp-syslog3164` | UDP | `127.0.0.1` | `9514` | Syslog 3164 | `100` |
+| `http-ndjson` | HTTP | `127.0.0.1` | `8080` | NDJSON | `100` |
+
+Profiles are just a base layer. CLI flags still override them:
+
+```bash
+protoglot --profile tcp-syslog5424 --host 10.0.0.12 --rate 5000 --events 100000
+```
+
+## Splunk HEC
+
+Protoglot can emit Splunk HEC-formatted HTTP payloads for testing HEC-compatible receivers and pipeline sources.
+
+```bash
+protoglot --profile splunk-hec
+```
+
+The HEC profile sends newline-delimited HEC event envelopes in each HTTP POST body. This avoids the wasteful one-event-per-request path while keeping the payload stream easy to parse and inspect.
+
+Default HEC settings:
+
+| Setting | Value |
+| --- | --- |
+| URL | `http://127.0.0.1:8088/services/collector/event` |
+| Auth header | `Authorization: Splunk protoglot-hec-token` |
+| Batch size | `100` events per POST |
+| Total events | `100` |
+
+Useful overrides:
+
+```bash
+protoglot --profile splunk-hec --hec-token xenomux-dev --events 50000
+protoglot --profile splunk-hec --host 10.0.0.12 --port 8088
+protoglot --profile splunk-hec --hec-batch-size 500 --rate 10000
+```
+
+HEC events include varied envelope metadata and event shapes, including object events, string events, metric-like events, audit-like events, and nested JSON. That variety is intentional: it is meant to exercise source parsing behavior, not just prove that a single happy-path JSON shape works.
 
 ## Emitters
 
-- Emitters are composed of:
-  - A data generator
-  - An event formatter/serializer
-  - A transport
-- Emitters can be configured to send events:
-  - At a configurable rate in events per second
-  - For a configurable number of events per cycle
-  - For a configurable number of cycles before exiting (or can run forever)
-  - With a configurable delay between cycles of events
-  - With or without TLS support (TCP only, HTTP in the future)
-  - Over TCP, UDP, or HTTP (HTTP support is not yet implemented)
-  - To a configurable IP/port
-  - With various event formats:
-    - Syslog 3164
-    - Syslog 5424 (octet-count framing coming soon)
-    - ... more to come ...
+With no subcommand, Protoglot runs as an emitter.
+
+```bash
+protoglot [OPTIONS]
+```
+
+Common emitter options:
+
+| Option | Meaning |
+| --- | --- |
+| `--profile <name>` | Start from a built-in profile. |
+| `--host <host>` | Target host. |
+| `--port <port>` | Target port. |
+| `--protocol <protocol>` | `tcp`, `tcps`, `udp`, `http`, or `https`. |
+| `--message-type <type>` | `syslog3164`, `syslog5424`, `syslog5424-octet`, `nd-json`, or `splunk-hec`. |
+| `--rate <n>` | Target event rate in events per second. |
+| `--events <n>` | Events per cycle. |
+| `--cycles <n>` | Number of cycles. Use `0` to run forever. |
+| `--cycle-delay <ms>` | Delay between cycles in milliseconds. |
+| `--emitters <n>` | Number of emitter tasks to run in parallel. |
+| `--hec-token <token>` | Splunk HEC token for `splunk-hec` payloads. |
+| `--hec-batch-size <n>` | HEC events per HTTP POST body. |
+
+Examples:
+
+```bash
+protoglot --profile tcp-syslog3164 --host 127.0.0.1 --events 10000
+protoglot --protocol udp --host 127.0.0.1 --port 9514 --message-type syslog3164
+protoglot --protocol http --host 127.0.0.1 --port 8080 --message-type nd-json
+protoglot --protocol tcps --host logs.example.test --port 6514 --message-type syslog5424
+```
 
 ## Absorbers
 
-- Absorbers are composed of:
-  - A listening address, port, and protocol
-  - A message checker (to verify correctness to some degree)
+The absorber listens for events, validates the selected message shape, and prints live stats.
+
+```bash
+protoglot absorber --listen tcp://127.0.0.1:9514 --message-type syslog3164
+```
+
+The `--listen` value uses this format:
+
+```text
+protocol://host:port
+```
+
+Examples:
+
+```bash
+protoglot absorber --listen tcp://127.0.0.1:9514 --message-type syslog5424
+protoglot absorber --listen udp://127.0.0.1:9514 --message-type syslog3164
+protoglot absorber --listen http://127.0.0.1:8080 --message-type nd-json
+protoglot absorber --listen http://127.0.0.1:8088 --message-type splunk-hec
+```
+
+Multiple listeners can be specified:
+
+```bash
+protoglot absorber \
+  --listen tcp://127.0.0.1:9514 \
+  --listen udp://127.0.0.1:9514 \
+  --message-type syslog3164
+```
+
+Interactive absorber controls:
+
+| Input | Effect |
+| --- | --- |
+| `rs` | Reset stats. |
+| `q` | Quit. |
+
+HTTP absorber notes:
+
+- `--https` enables HTTPS/1.1.
+- `--http2` enables HTTP/2 and implies TLS.
+- `--self-signed` uses a generated self-signed cert.
+- `--private-ca` uses a generated private CA and server cert.
+- `--mtls` requires client certs signed by the generated private CA.
+- `--auth basic` and `--auth token` enable simple auth checks for HTTP absorber testing.
+
+## Config Files
+
+Everything available from the CLI can also be represented in config.
+
+Write the default user config:
+
+```bash
+protoglot config
+```
+
+By default, Protoglot writes and reads the user config at the platform config path:
+
+| Platform | Path |
+| --- | --- |
+| Linux | `~/.config/protoglot/config.json5` |
+| macOS | `~/Library/Application Support/com.ansonvandoren.protoglot/config.json5` |
+| Windows | `C:\Users\<username>\AppData\Roaming\ansonvandoren\protoglot\config\config.json5` |
+
+Write a profile template into the current working directory:
+
+```bash
+protoglot config --template --profile splunk-hec
+```
+
+That creates:
+
+```text
+protoglot.splunk-hec.json
+```
+
+Choose your own output path:
+
+```bash
+protoglot config --template --profile splunk-hec --output ./hec-local.json
+```
+
+Run from a config file:
+
+```bash
+protoglot --file ./hec-local.json
+```
+
+Config precedence is:
+
+1. Built-in defaults.
+2. User config file, if present.
+3. Selected `--profile`, if present.
+4. Explicit `--file`, if present.
+5. Direct CLI flags.
+
+This means you can keep a long-lived config file and still use CLI overrides for the things you change often:
+
+```bash
+protoglot --file ./hec-local.json --hec-token temporary-token --events 250000
+```
+
+## Development
+
+This repo includes `mise` tasks for the common development loop.
+
+List tasks:
+
+```bash
+mise tasks
+```
+
+Build and test:
+
+```bash
+mise run build
+mise run test
+mise run clippy
+```
+
+CI-style check:
+
+```bash
+mise run ci
+```
+
+Without `mise`, the equivalent core commands are:
+
+```bash
+cargo build
+cargo nextest run
+cargo clippy --all-targets --all-features
+cargo test --verbose
+```
+
+## Logging
+
+Use `-v`, `-vv`, or `-vvv` to increase Protoglot logging verbosity.
+
+You can also set `RUST_LOG` for more targeted Rust logging behavior:
+
+```bash
+RUST_LOG=debug protoglot --profile splunk-hec
+```
+
+## Current Message Types
+
+| Message type | CLI value | Notes |
+| --- | --- | --- |
+| Syslog 3164 | `syslog3164` | Traditional BSD-style syslog-ish payloads. |
+| Syslog 5424 | `syslog5424` | RFC 5424-style syslog payloads. |
+| Syslog 5424 octet-counted | `syslog5424-octet` | RFC 5424 payloads with octet-count framing. |
+| NDJSON | `nd-json` | Newline-delimited JSON events. |
+| Splunk HEC | `splunk-hec` | Newline-delimited HEC event envelopes over HTTP/HTTPS. |
+
+## Project Status
+
+Protoglot is intentionally pragmatic: it is not a full load-testing suite and it is not trying to perfectly emulate every producer. It is a focused tool for generating and absorbing enough realistic data to shake out source configuration, parsing behavior, transport issues, TLS/auth paths, and throughput bottlenecks.

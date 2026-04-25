@@ -36,7 +36,6 @@ Agent-facing instructions for working in `/home/anson/src/protoglot`.
 - Configuration and CLI parsing: `src/config/`
 - Emit path: `src/emitter.rs`, `src/generators/`, `src/transports/`
 - Absorb path: `src/absorber/`
-- Docker packaging: `Dockerfile`, `entrypoint.sh`
 - Product and workflow notes: `conductor/`
 - Mise task definitions: `.mise/config.toml`
 - CI workflow: `.github/workflows/merge-and-pr-build.yml`
@@ -103,14 +102,6 @@ mise run config
 cargo run -- --help
 cargo run -- absorber --help
 cargo run -- config
-```
-
-Docker smoke check:
-
-```bash
-mise run docker:smoke
-docker build -t protoglot:local .
-docker run --rm protoglot:local --help
 ```
 
 ## Required Project Rules
