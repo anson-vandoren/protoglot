@@ -32,6 +32,10 @@ impl Transport for TcpTransport {
     async fn send(&mut self, data: &[u8]) -> tokio::io::Result<()> {
         tokio::io::AsyncWriteExt::write_all(&mut self.stream, data).await
     }
+
+    async fn shutdown(&mut self) -> tokio::io::Result<()> {
+        tokio::io::AsyncWriteExt::shutdown(&mut self.stream).await
+    }
 }
 
 impl fmt::Display for TcpTransport {

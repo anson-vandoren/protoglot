@@ -57,7 +57,10 @@ where
                 }
                 self.total_bytes += buf.len() as u64;
                 self.total_events += events_in_batch;
-                self.transport.send(&buf).await?;
+                if let Err(err) = self.transport.send(&buf).await {
+                    let _ = self.transport.shutdown().await;
+                    return Err(err);
+                }
 
                 events_sent_this_cycle += events_in_batch;
                 next_tick += Duration::from_nanos(interval_nanos.saturating_mul(events_in_batch));
@@ -71,6 +74,8 @@ where
                 tokio::time::sleep(Duration::from_millis(self.config.cycle_delay)).await;
             }
         }
+
+        self.transport.shutdown().await?;
 
         let duration = start_time.elapsed();
         let duration_secs = duration.as_secs_f64();
@@ -116,11 +121,17 @@ mod tests {
 
     struct FakeTransport {
         sends: Arc<Mutex<Vec<Vec<u8>>>>,
+        shutdowns: Arc<Mutex<u32>>,
     }
 
     impl Transport for FakeTransport {
         async fn send(&mut self, data: &[u8]) -> tokio::io::Result<()> {
             self.sends.lock().unwrap().push(data.to_vec());
+            Ok(())
+        }
+
+        async fn shutdown(&mut self) -> tokio::io::Result<()> {
+            *self.shutdowns.lock().unwrap() += 1;
             Ok(())
         }
     }
@@ -134,7 +145,11 @@ mod tests {
     #[tokio::test]
     async fn batches_multiple_events_per_transport_send() {
         let sends = Arc::new(Mutex::new(Vec::new()));
-        let transport = FakeTransport { sends: sends.clone() };
+        let shutdowns = Arc::new(Mutex::new(0));
+        let transport = FakeTransport {
+            sends: sends.clone(),
+            shutdowns: shutdowns.clone(),
+        };
         let generator = FakeGenerator { next: 0 };
         let config = EmitterConfig {
             rate: 1_000_000,
@@ -146,6 +161,8 @@ mod tests {
         let mut emitter = Emitter::new(transport, generator, config);
 
         emitter.run().await.unwrap();
+
+        assert_eq!(*shutdowns.lock().unwrap(), 1);
 
         let sends = sends.lock().unwrap();
         assert_eq!(sends.len(), 3);

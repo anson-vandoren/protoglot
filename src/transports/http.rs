@@ -42,6 +42,10 @@ impl Transport for HttpTransport {
             )))
         }
     }
+
+    async fn shutdown(&mut self) -> tokio::io::Result<()> {
+        Ok(())
+    }
 }
 
 impl fmt::Display for HttpTransport {

@@ -33,6 +33,10 @@ impl Transport for UdpTransport {
             Err(e) => Err(e),
         }
     }
+
+    async fn shutdown(&mut self) -> tokio::io::Result<()> {
+        Ok(())
+    }
 }
 
 impl fmt::Display for UdpTransport {

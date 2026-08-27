@@ -25,10 +25,20 @@ impl Transport for TransportType {
             TransportType::Http(transport) => transport.send(data).await,
         }
     }
+
+    async fn shutdown(&mut self) -> tokio::io::Result<()> {
+        match self {
+            TransportType::Tcp(transport) => transport.shutdown().await,
+            TransportType::TcpTls(transport) => transport.shutdown().await,
+            TransportType::Udp(transport) => transport.shutdown().await,
+            TransportType::Http(transport) => transport.shutdown().await,
+        }
+    }
 }
 
 pub trait Transport: Send {
     fn send(&mut self, data: &[u8]) -> impl std::future::Future<Output = tokio::io::Result<()>> + Send;
+    fn shutdown(&mut self) -> impl std::future::Future<Output = tokio::io::Result<()>> + Send;
 }
 
 impl fmt::Display for TransportType {
