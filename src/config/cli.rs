@@ -38,6 +38,21 @@ pub struct CliArgs {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tls: Option<bool>,
 
+    /// PEM client certificate chain for TLS authentication
+    #[arg(long = "client-cert")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub client_cert: Option<PathBuf>,
+
+    /// PEM private key matching --client-cert
+    #[arg(long = "client-key")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub client_key: Option<PathBuf>,
+
+    /// Additional PEM CA certificates to trust for TLS servers
+    #[arg(long = "ca-cert")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ca_cert: Option<PathBuf>,
+
     /// Protocol to use
     #[arg(short = 'P', long)]
     #[serde(skip_serializing_if = "Option::is_none")]

@@ -114,6 +114,9 @@ Common emitter options:
 | `--host <host>` | Target host. |
 | `--port <port>` | Target port. |
 | `--protocol <protocol>` | `tcp`, `tcps`, `udp`, `http`, or `https`. |
+| `--client-cert <path>` | PEM client certificate chain for TLS authentication; requires `--client-key`. |
+| `--client-key <path>` | PEM private key matching `--client-cert`. |
+| `--ca-cert <path>` | Additional PEM CA certificates to trust for TLS servers. |
 | `--message-type <type>` | `syslog3164`, `syslog5424`, `syslog5424-octet`, `nd-json`, or `splunk-hec`. |
 | `--rate <n>` | Target event rate in events per second. |
 | `--events <n>` | Events per cycle. |
@@ -130,7 +133,13 @@ protoglot --profile tcp-syslog3164 --host 127.0.0.1 --events 10000
 protoglot --protocol udp --host 127.0.0.1 --port 9514 --message-type syslog3164
 protoglot --protocol http --host 127.0.0.1 --port 8080 --message-type nd-json
 protoglot --protocol tcps --host logs.example.test --port 6514 --message-type syslog5424
+protoglot --protocol tcps --host logs.example.test --port 6514 --message-type syslog5424 \
+  --client-cert ./client-cert.pem --client-key ./client-key.pem
+protoglot --protocol https --host ingest.example.test --port 443 --message-type nd-json \
+  --client-cert ./client-cert.pem --client-key ./client-key.pem --ca-cert ./private-ca.pem
 ```
+
+Client certificates are only used by TLS-enabled TCP and HTTPS emitters. `--client-cert` and `--client-key` must be supplied together and do not enable TLS implicitly. Native system roots remain trusted; use `--ca-cert` only when the server requires an additional private CA. Config files use the corresponding `clientCert`, `clientKey`, and `caCert` emitter keys.
 
 ## Absorbers
 

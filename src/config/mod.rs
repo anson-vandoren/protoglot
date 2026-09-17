@@ -166,7 +166,7 @@ impl AppSettings {
         // overwrite with cli args that are present
         let cli_args: PartialEmitterConfig = args.into();
         let config = config.merge(cli_args);
-
+        config.validate()?;
         Ok(AppSettings {
             mode: AppMode::Emitter,
             emitter: Some(config),

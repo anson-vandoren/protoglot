@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use serde::{Deserialize, Serialize};
 
 use super::{FullConfig, MessageType, Profile, Protocol, cli::CliArgs};
@@ -12,6 +14,9 @@ pub struct EmitterConfig {
     pub port: u16,
     pub rate: u64,
     pub tls: bool,
+    pub client_cert: Option<PathBuf>,
+    pub client_key: Option<PathBuf>,
+    pub ca_cert: Option<PathBuf>,
     pub protocol: Protocol,
     pub message_type: MessageType,
     pub num_emitters: u64,
@@ -28,6 +33,9 @@ impl Default for EmitterConfig {
             host: "localhost".into(),
             port: 9514,
             tls: false,
+            client_cert: None,
+            client_key: None,
+            ca_cert: None,
             protocol: Protocol::Tcp,
             rate: 1000,
             message_type: MessageType::Syslog3164,
@@ -54,6 +62,15 @@ impl EmitterConfig {
         }
         if let Some(other) = other.tls {
             self.tls = other;
+        }
+        if let Some(other) = other.client_cert {
+            self.client_cert = Some(other);
+        }
+        if let Some(other) = other.client_key {
+            self.client_key = Some(other);
+        }
+        if let Some(other) = other.ca_cert {
+            self.ca_cert = Some(other);
         }
         if let Some(other) = other.protocol {
             self.protocol = other;
@@ -89,6 +106,22 @@ impl EmitterConfig {
             return self.merge(emitter_config);
         }
         self
+    }
+
+    pub(super) fn validate(&self) -> anyhow::Result<()> {
+        match (&self.client_cert, &self.client_key) {
+            (Some(_), None) => anyhow::bail!("--client-key is required when --client-cert is set"),
+            (None, Some(_)) => anyhow::bail!("--client-cert is required when --client-key is set"),
+            _ => {}
+        }
+
+        let has_tls_files = self.client_cert.is_some() || self.ca_cert.is_some();
+        let uses_tls = matches!(self.protocol, Protocol::Tcps | Protocol::Https) || (matches!(self.protocol, Protocol::Tcp) && self.tls);
+        if has_tls_files && !uses_tls {
+            anyhow::bail!("client certificate and CA options require a TLS-enabled TCP or HTTPS transport");
+        }
+
+        Ok(())
     }
 }
 
@@ -158,6 +191,9 @@ impl From<CliArgs> for PartialEmitterConfig {
             port: value.port,
             rate: value.rate,
             tls: value.tls,
+            client_cert: value.client_cert,
+            client_key: value.client_key,
+            ca_cert: value.ca_cert,
             protocol: value.protocol,
             message_type: value.message_type,
             num_emitters: value.num_emitters,
@@ -181,6 +217,12 @@ pub struct PartialEmitterConfig {
     pub rate: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tls: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub client_cert: Option<PathBuf>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub client_key: Option<PathBuf>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ca_cert: Option<PathBuf>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub protocol: Option<Protocol>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -206,6 +248,9 @@ impl From<EmitterConfig> for PartialEmitterConfig {
             port: Some(value.port),
             rate: Some(value.rate),
             tls: Some(value.tls),
+            client_cert: value.client_cert,
+            client_key: value.client_key,
+            ca_cert: value.ca_cert,
             protocol: Some(value.protocol),
             message_type: Some(value.message_type),
             num_emitters: Some(value.num_emitters),

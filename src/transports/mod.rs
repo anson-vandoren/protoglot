@@ -57,7 +57,15 @@ pub async fn create_transport(config: &EmitterConfig) -> anyhow::Result<Transpor
         Protocol::Tcp | Protocol::Tcps => {
             let use_tls = config.tls || matches!(config.protocol, Protocol::Tcps);
             if use_tls {
-                match tcp_tls::TcpTlsTransport::new(config.host.clone(), config.port).await {
+                match tcp_tls::TcpTlsTransport::new(
+                    config.host.clone(),
+                    config.port,
+                    config.client_cert.as_deref(),
+                    config.client_key.as_deref(),
+                    config.ca_cert.as_deref(),
+                )
+                .await
+                {
                     Ok(transport) => Ok(TransportType::TcpTls(Box::new(transport))),
                     Err(err) => {
                         error!("Failed to create TcpTlsTransport: {}", err);
@@ -87,9 +95,17 @@ pub async fn create_transport(config: &EmitterConfig) -> anyhow::Result<Transpor
                 MessageType::SplunkHec => Some(config.hec_token.clone()),
                 _ => None,
             };
-            http::HttpTransport::new(&protocol, config.host.clone(), config.port, hec_token)
-                .map(TransportType::Http)
-                .inspect_err(|err| error!("Failed to create HttpTransport: {}", err))
+            http::HttpTransport::new(
+                &protocol,
+                config.host.clone(),
+                config.port,
+                hec_token,
+                config.client_cert.as_deref(),
+                config.client_key.as_deref(),
+                config.ca_cert.as_deref(),
+            )
+            .map(TransportType::Http)
+            .inspect_err(|err| error!("Failed to create HttpTransport: {}", err))
         }
     }
 }

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- TCP TLS and HTTPS emitters can authenticate with PEM client certificates and trust additional PEM CA certificates.
+
 ### Fixed
 
 - TCP and TLS emitters now shut down connections gracefully after emission completes.
