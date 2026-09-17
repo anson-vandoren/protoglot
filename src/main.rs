@@ -1,4 +1,5 @@
 mod absorber;
+mod cert;
 mod config;
 mod emitter;
 mod generators;
@@ -22,7 +23,7 @@ async fn main() -> anyhow::Result<()> {
         error!("Failed to load configuration: {}", err);
         std::process::exit(1);
     });
-    if matches!(config.mode, AppMode::Config) {
+    if matches!(config.mode, AppMode::Config | AppMode::Cert) {
         return Ok(());
     }
     if !log::log_enabled!(log::Level::Info) {

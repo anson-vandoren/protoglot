@@ -31,6 +31,7 @@ pub enum AppMode {
     Emitter,
     Absorber,
     Config,
+    Cert,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -99,6 +100,14 @@ impl AppSettings {
                     emitter: None,
                     absorber: Self::load_absorber_config(args)?.absorber,
                     mode: AppMode::Absorber,
+                }
+            }
+            Some(Commands::Cert { command }) => {
+                crate::cert::run(command)?;
+                Self {
+                    emitter: None,
+                    absorber: None,
+                    mode: AppMode::Cert,
                 }
             }
             Some(Commands::Config {
@@ -221,9 +230,15 @@ fn load_default_config_file() -> Option<FullConfig> {
     None
 }
 
+pub(crate) fn project_config_dir() -> PathBuf {
+    ProjectDirs::from("com", "ansonvandoren", "protoglot")
+        .expect("$HOME directory not found.")
+        .config_dir()
+        .to_path_buf()
+}
+
 fn default_config_path() -> PathBuf {
-    let proj_dirs = ProjectDirs::from("com", "ansonvandoren", "protoglot").expect("$HOME directory not found.");
-    proj_dirs.config_dir().join("config.json5")
+    project_config_dir().join("config.json5")
 }
 
 fn write_default_config(overwrite: bool, profile: Option<Profile>, template: bool, output: Option<PathBuf>) -> anyhow::Result<()> {

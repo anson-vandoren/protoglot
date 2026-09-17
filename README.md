@@ -141,6 +141,37 @@ protoglot --protocol https --host ingest.example.test --port 443 --message-type 
 
 Client certificates are only used by TLS-enabled TCP and HTTPS emitters. `--client-cert` and `--client-key` must be supplied together and do not enable TLS implicitly. Native system roots remain trusted; use `--ca-cert` only when the server requires an additional private CA. Config files use the corresponding `clientCert`, `clientKey`, and `caCert` emitter keys.
 
+## Test Certificates
+
+Protoglot can create a persistent test CA and use it to sign server and client certificates. On Linux, certificates are stored in `~/.config/protoglot/certs/`; other platforms use their native Protoglot configuration directory.
+
+Generate certificates with explicit subject alternative names:
+
+```bash
+protoglot cert generate --type server --name api --dns localhost --ip 127.0.0.1
+protoglot cert generate --type client --name sender --uri spiffe://example.test/sender --email sender@example.test
+```
+
+`--ip`, `--dns`, `--uri`, and `--email` may each be repeated. The reference supplied with `--name` only controls the filenames: `<name>.pem` contains the certificate and `<name>_key.pem` contains its private key. It is not added to the certificate subject or SANs.
+
+The first generation creates the signing CA at `certs/ca/ca.pem` with its key at `certs/ca/ca_key.pem`. Later certificates reuse that CA. If a named certificate or key already exists, Protoglot asks before replacing both; use `--force` to replace them without prompting.
+
+Print a certificate PEM to stdout:
+
+```bash
+protoglot cert print api
+protoglot cert print ca
+```
+
+For example, use a generated client certificate with an emitter:
+
+```bash
+protoglot --protocol tcps --host logs.example.test --port 6514 \
+  --client-cert ~/.config/protoglot/certs/sender.pem \
+  --client-key ~/.config/protoglot/certs/sender_key.pem \
+  --ca-cert ~/.config/protoglot/certs/ca/ca.pem
+```
+
 ## Absorbers
 
 The absorber listens for events, validates the selected message shape, and prints live stats.

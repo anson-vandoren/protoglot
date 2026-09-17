@@ -1,6 +1,6 @@
-use std::path::PathBuf;
+use std::{net::IpAddr, path::PathBuf};
 
-use clap::{ArgAction, Parser, Subcommand};
+use clap::{ArgAction, Parser, Subcommand, ValueEnum};
 use serde::{Deserialize, Serialize};
 
 use super::{MessageType, Profile, Protocol, absorber::HttpAuth};
@@ -154,6 +154,12 @@ pub enum Commands {
         auth: Option<HttpAuth>,
     },
 
+    /// Generate and print certificates for local testing
+    Cert {
+        #[command(subcommand)]
+        command: CertCommands,
+    },
+
     /// Write the default config to expected path, if one does not already exist
     Config {
         /// Overwrite the config file if it exists, saving the old one to a .$timestamp.bak
@@ -176,4 +182,52 @@ pub enum Commands {
         #[serde(skip_serializing_if = "Option::is_none")]
         output: Option<PathBuf>,
     },
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, Subcommand)]
+#[serde(rename_all = "camelCase")]
+pub enum CertCommands {
+    /// Generate a CA-signed certificate and private key
+    Generate {
+        /// Certificate usage
+        #[arg(long = "type", value_enum)]
+        cert_type: CertType,
+
+        /// File reference used for the certificate and key
+        #[arg(long)]
+        name: String,
+
+        /// IP subject alternative name; may be specified multiple times
+        #[arg(long)]
+        ip: Vec<IpAddr>,
+
+        /// DNS subject alternative name; may be specified multiple times
+        #[arg(long)]
+        dns: Vec<String>,
+
+        /// URI subject alternative name; may be specified multiple times
+        #[arg(long)]
+        uri: Vec<String>,
+
+        /// Email subject alternative name; may be specified multiple times
+        #[arg(long)]
+        email: Vec<String>,
+
+        /// Replace an existing certificate and key without prompting
+        #[arg(long)]
+        force: bool,
+    },
+
+    /// Print a named certificate, or "ca" for the signing CA
+    Print {
+        /// Certificate name
+        name: String,
+    },
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ValueEnum)]
+#[serde(rename_all = "lowercase")]
+pub enum CertType {
+    Server,
+    Client,
 }
