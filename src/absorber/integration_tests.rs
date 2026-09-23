@@ -13,7 +13,7 @@ mod tests {
 
     #[test(tokio::test)]
     async fn test_tcp_absorber_decompression_metrics_direct() {
-        let stats = StatsSvc::run(1000);
+        let stats = StatsSvc::run(1000, None);
         let message_type = MessageType::NdJson;
 
         // Prepare gzipped data
@@ -43,7 +43,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_tcp_absorber_decompression_metrics_with_trailing_newline() {
-        let stats = StatsSvc::run(1000);
+        let stats = StatsSvc::run(1000, None);
         let message_type = MessageType::NdJson;
 
         // Prepare gzipped data with TWO newlines
@@ -62,7 +62,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_tcp_absorber_decompression_metrics_with_trailing_space() {
-        let stats = StatsSvc::run(1000);
+        let stats = StatsSvc::run(1000, None);
         let message_type = MessageType::NdJson;
 
         // Prepare gzipped data with trailing space
@@ -84,7 +84,7 @@ mod tests {
     #[tokio::test]
     async fn test_tcp_absorber_zstd_metrics_direct() {
         use async_compression::tokio::write::ZstdEncoder;
-        let stats = StatsSvc::run(1000);
+        let stats = StatsSvc::run(1000, None);
         let message_type = MessageType::NdJson;
 
         let original_data = b"{\"key\": \"value\"}\n";
@@ -109,7 +109,7 @@ mod tests {
     #[tokio::test]
     async fn test_tcp_absorber_lz4_metrics_direct() {
         use async_compression::tokio::write::Lz4Encoder;
-        let stats = StatsSvc::run(1000);
+        let stats = StatsSvc::run(1000, None);
         let message_type = MessageType::NdJson;
 
         let original_data = b"{\"key\": \"value\"}\n";
@@ -133,7 +133,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_tcp_absorber_snappy_metrics_direct() {
-        let stats = StatsSvc::run(1000);
+        let stats = StatsSvc::run(1000, None);
         let message_type = MessageType::NdJson;
 
         let original_data = b"{\"key\": \"value\"}\n";
@@ -156,7 +156,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_tcp_absorber_uncompressed_metrics_direct() {
-        let stats = StatsSvc::run(1000);
+        let stats = StatsSvc::run(1000, None);
         let message_type = MessageType::NdJson;
 
         let original_data = b"{\"key\": \"value\"}\n";

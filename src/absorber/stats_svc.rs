@@ -1,4 +1,11 @@
-use std::time::Duration;
+use std::{
+    num::NonZeroU64,
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    },
+    time::Duration,
+};
 
 use human_bytes::human_bytes;
 use log::info;
@@ -21,10 +28,12 @@ pub(crate) struct AbsorberStats {
 #[derive(Clone)]
 pub(crate) struct StatsSvc {
     tx: mpsc::Sender<StatsMessage>,
+    print_every: Option<NonZeroU64>,
+    received_events: Arc<AtomicU64>,
 }
 
 impl StatsSvc {
-    pub fn run(update_intv_millis: u64) -> Self {
+    pub fn run(update_intv_millis: u64, print_every: Option<NonZeroU64>) -> Self {
         let mut stats = AbsorberStats::new();
         let (tx, mut rx) = mpsc::channel(100);
 
@@ -103,7 +112,11 @@ impl StatsSvc {
             }
         };
         tokio::spawn(task);
-        Self { tx }
+        Self {
+            tx,
+            print_every,
+            received_events: Arc::new(AtomicU64::new(0)),
+        }
     }
 
     pub async fn increment(&self, events: usize, raw_bytes: usize, decomp_bytes: usize) {
@@ -123,6 +136,23 @@ impl StatsSvc {
             raw_bytes,
             decomp_bytes,
         });
+    }
+
+    pub fn print_event(&self, message: &[u8]) {
+        if !self.should_print_event() {
+            return;
+        }
+        let message = String::from_utf8_lossy(message);
+        let message = message.trim_end_matches(['\r', '\n']);
+        println!("Received event: {message}");
+    }
+
+    fn should_print_event(&self) -> bool {
+        let Some(every) = self.print_every else {
+            return false;
+        };
+        let event_number = self.received_events.fetch_add(1, Ordering::Relaxed).wrapping_add(1);
+        event_number.is_multiple_of(every.get())
     }
 
     pub async fn reset(&self) {
@@ -196,5 +226,24 @@ mod tests {
         assert_eq!(stats.total_events, 2);
         assert_eq!(stats.total_raw_bytes, 150);
         assert_eq!(stats.total_decomp_bytes, 300);
+    }
+
+    #[tokio::test]
+    async fn print_schedule_is_shared_across_clones() {
+        let stats = StatsSvc::run(1000, NonZeroU64::new(3));
+        let other_listener = stats.clone();
+
+        assert!(!stats.should_print_event());
+        assert!(!other_listener.should_print_event());
+        assert!(stats.should_print_event());
+        assert!(!other_listener.should_print_event());
+    }
+
+    #[tokio::test]
+    async fn disabled_print_schedule_does_not_count_events() {
+        let stats = StatsSvc::run(1000, None);
+
+        assert!(!stats.should_print_event());
+        assert_eq!(stats.received_events.load(Ordering::Relaxed), 0);
     }
 }

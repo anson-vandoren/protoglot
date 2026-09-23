@@ -149,7 +149,7 @@ async fn handle_request(
     }
     let stream = get_decompressed(req, stats.clone());
 
-    let StatsUpdate { events, bytes } = match process_messages(stream, message_type).await {
+    let StatsUpdate { events, bytes } = match process_messages(stream, message_type, &stats).await {
         Ok(stats) => stats,
         Err(err) => return Ok(err),
     };
@@ -183,7 +183,7 @@ struct StatsUpdate {
     events: usize,
     bytes: usize,
 }
-async fn process_messages(stream: Stream, message_type: MessageType) -> Result<StatsUpdate, Response<String>> {
+async fn process_messages(stream: Stream, message_type: MessageType, stats: &StatsSvc) -> Result<StatsUpdate, Response<String>> {
     let mut msg = Vec::new();
     let mut events = 0;
     let mut bytes = 0;
@@ -201,6 +201,7 @@ async fn process_messages(stream: Stream, message_type: MessageType) -> Result<S
                     .body("Invalid message format".to_string())
                     .unwrap());
             }
+            stats.print_event(&message);
             events += 1;
             bytes += message.len();
         }

@@ -1,3 +1,5 @@
+use std::num::NonZeroU64;
+
 use clap::ValueEnum;
 use log::{info, warn};
 use serde::{Deserialize, Serialize};
@@ -21,6 +23,8 @@ pub enum HttpAuth {
 pub struct AbsorberConfig {
     pub listen_addresses: Vec<ListenAddress>,
     pub update_interval: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub print_every: Option<NonZeroU64>,
     pub message_type: MessageType,
     /// Note that HTTP2 implies HTTPS
     pub http2: bool,
@@ -39,6 +43,8 @@ pub struct PartialAbsorberConfig {
     pub listen_addresses: Option<Vec<ListenAddress>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub update_interval: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub print_every: Option<NonZeroU64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message_type: Option<MessageType>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -62,6 +68,7 @@ impl Default for AbsorberConfig {
         Self {
             listen_addresses: vec![],
             update_interval: 5000,
+            print_every: None,
             message_type: MessageType::Syslog3164,
             http2: false,
             https: false,
@@ -79,6 +86,7 @@ impl AbsorberConfig {
         let PartialAbsorberConfig {
             listen_addresses,
             update_interval,
+            print_every,
             message_type,
             http2,
             https,
@@ -94,6 +102,9 @@ impl AbsorberConfig {
         }
         if let Some(update_interval) = update_interval {
             self.update_interval = update_interval;
+        }
+        if let Some(print_every) = print_every {
+            self.print_every = Some(print_every);
         }
         if let Some(message_type) = message_type {
             self.message_type = message_type;
@@ -157,6 +168,7 @@ impl From<Option<Commands>> for PartialAbsorberConfig {
     fn from(value: Option<Commands>) -> Self {
         if let Some(Commands::Absorber {
             update_interval,
+            print_every,
             listen_addresses,
             message_type,
             http2,
@@ -178,6 +190,7 @@ impl From<Option<Commands>> for PartialAbsorberConfig {
 
             return Self {
                 update_interval,
+                print_every,
                 listen_addresses,
                 message_type,
                 http2,
@@ -198,6 +211,7 @@ impl From<AbsorberConfig> for PartialAbsorberConfig {
     fn from(value: AbsorberConfig) -> Self {
         PartialAbsorberConfig {
             update_interval: Some(value.update_interval),
+            print_every: value.print_every,
             listen_addresses: Some(value.listen_addresses),
             message_type: Some(value.message_type),
             http2: Some(value.http2),

@@ -124,7 +124,7 @@ impl Absorber {
     pub async fn run(&self) -> tokio::io::Result<()> {
         let mut handles = vec![];
         let update_interval = self.config.update_interval;
-        let stats_svc = StatsSvc::run(update_interval);
+        let stats_svc = StatsSvc::run(update_interval, self.config.print_every);
 
         let conn_opts: Vec<ConnOptions> = self.config.deref().into();
         for conn_opt in conn_opts {
@@ -191,6 +191,7 @@ async fn process_message(message: &[u8], stats: &StatsSvc, message_type: &Messag
 
     // Validate and process the message
     if validate_message(message, message_type) {
+        stats.print_event(message);
         let message_len = message.len();
         stats.increment(1, 0, message_len).await;
     } else {

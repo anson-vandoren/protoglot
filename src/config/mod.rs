@@ -423,10 +423,28 @@ mod test_load_absorber {
     }
 
     #[sealed_test(env = [("XDG_CONFIG_HOME", "./.config"), ("HOME", "./")])]
+    fn cli_sets_print_every() {
+        let args = ["protoglot", "absorber", "--print-every", "3"];
+        let args = CliArgs::parse_from(args.iter());
+
+        let config = AppSettings::load_absorber_config(args).unwrap();
+
+        assert_eq!(config.absorber.unwrap().print_every.unwrap().get(), 3);
+    }
+
+    #[test]
+    fn cli_rejects_zero_print_every() {
+        let args = ["protoglot", "absorber", "--print-every", "0"];
+
+        assert!(CliArgs::try_parse_from(args.iter()).is_err());
+    }
+
+    #[sealed_test(env = [("XDG_CONFIG_HOME", "./.config"), ("HOME", "./")])]
     fn uses_base_config_file() {
         // write a base config file
         let config = PartialAbsorberConfig {
             update_interval: Some(4242),
+            print_every: std::num::NonZeroU64::new(7),
             listen_addresses: None,
             message_type: None,
             ..Default::default()
@@ -454,10 +472,11 @@ mod test_load_absorber {
             found,
             AbsorberConfig {
                 update_interval: 4242,
+                print_every: Some(print_every),
                 message_type,
                 listen_addresses,
                 ..
-            } if message_type == MessageType::Syslog3164 && listen_addresses.is_empty()
+            } if print_every.get() == 7 && message_type == MessageType::Syslog3164 && listen_addresses.is_empty()
         );
     }
 

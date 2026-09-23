@@ -204,6 +204,14 @@ protoglot absorber \
   --message-type syslog3164
 ```
 
+Print every Nth successfully validated event with `--print-every`. Use `1` to print every event. The count is shared across all listeners:
+
+```bash
+protoglot absorber --listen udp://127.0.0.1:9514 --print-every 100
+```
+
+The equivalent JSON5 config key is `printEvery`. Event printing is disabled when the option is omitted.
+
 Interactive absorber controls:
 
 | Input | Effect |

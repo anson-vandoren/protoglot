@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - A `cert` command can generate persistent CA-signed server and client test certificates with configurable SANs.
 - TCP TLS and HTTPS emitters can authenticate with PEM client certificates and trust additional PEM CA certificates.
+- Absorbers can print every Nth validated event with `--print-every` or the `printEvery` config key.
 
 ### Fixed
 

@@ -1,4 +1,4 @@
-use std::{net::IpAddr, path::PathBuf};
+use std::{net::IpAddr, num::NonZeroU64, path::PathBuf};
 
 use clap::{ArgAction, Parser, Subcommand, ValueEnum};
 use serde::{Deserialize, Serialize};
@@ -110,6 +110,11 @@ pub enum Commands {
         #[arg(long = "update-interval")]
         #[serde(skip_serializing_if = "Option::is_none")]
         update_interval: Option<u64>,
+
+        /// Print every Nth successfully validated event
+        #[arg(long = "print-every")]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        print_every: Option<NonZeroU64>,
 
         /// Listen addresses for absorber (format: host:port:protocol, can be specified multiple times)
         #[arg(long = "listen")]
